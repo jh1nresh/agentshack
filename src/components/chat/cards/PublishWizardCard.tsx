@@ -237,7 +237,7 @@ export function PublishWizardCard() {
     return (
       <div className="classified" data-label="Publish Skill">
         <p className="mb-3 font-serif text-sm text-[var(--paper-ink-60)]">
-          Log in to publish a skill on the Dojo marketplace.
+          Log in to publish a skill on AgentShack.
         </p>
         <button
           onClick={login}

@@ -230,7 +230,7 @@ export function ChatRoom() {
             <div className="mb-8">
               <div className="mb-1.5 flex items-center gap-2">
                 <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-[var(--paper-accent)]">
-                  Dojo
+                  AgentShack
                 </span>
                 <span className="h-px flex-1 bg-[var(--paper-ink-10)]" />
               </div>

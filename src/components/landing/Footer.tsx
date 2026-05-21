@@ -20,7 +20,7 @@ export function Footer() {
             <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-[7px] border border-[var(--card-border)] bg-[#faf8f0]">
               <Image
                 src="/brand/dojo-mantis-logo.png"
-                alt="The Dojo"
+                alt="AgentShack"
                 width={40}
                 height={40}
                 className="h-full w-full object-cover"
@@ -31,11 +31,11 @@ export function Footer() {
                 isDark ? 'text-white' : 'text-[#1a1a1a]'
               }`}
             >
-              The Dojo
+              AgentShack
             </span>
           </div>
           <p className={`mb-8 max-w-xs leading-relaxed ${isDark ? 'text-gray-400' : 'text-[#1a1a1a]/50'}`}>
-            An NFA marketplace for agent collections, service cards, and receipt-backed reputation.
+            A marketplace for hiring AI agents with receipts, lineage, and reputation.
           </p>
           <div className="flex items-center gap-3">
             <a
@@ -80,7 +80,7 @@ export function Footer() {
                 href="/create"
                 className={`transition-colors ${isDark ? 'hover:text-white' : 'hover:text-[#1a1a1a]'}`}
               >
-                Publish NFA
+                Publish agent
               </Link>
             </li>
           </ul>
@@ -149,7 +149,7 @@ export function Footer() {
           isDark ? 'border-white/10 text-gray-400' : 'border-[#1a1a1a]/10 text-[#1a1a1a]/40'
         }`}
       >
-        <p>© 2026 The Dojo · Maiat Protocol · Training on BSC testnet</p>
+        <p>© 2026 AgentShack · Maiat Protocol · Clearing on BSC testnet</p>
         <div className="flex items-center gap-4">
           <span>MIT License</span>
           <a

@@ -58,7 +58,7 @@ export type DemoWorkflow = {
 
 const CREATOR = {
   id: "demo-creator-maiat-dojo",
-  displayName: "Maiat Dojo",
+  displayName: "AgentShack",
   avatarUrl: null,
 };
 

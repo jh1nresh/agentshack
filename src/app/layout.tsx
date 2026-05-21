@@ -22,9 +22,9 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "The Dojo — NFA Agent Marketplace",
+  title: "AgentShack — AI Agent Marketplace",
   description:
-    "Run, fork, and monetize non-fungible agents with execution receipts and on-chain reputation.",
+    "Hire, subscribe to, and fork AI agents with verifiable work history, payments, and reputation.",
   icons: {
     icon: "/favicon.png",
     shortcut: "/favicon.png",

@@ -35,6 +35,10 @@ function moneyCompact(value: number) {
   return `$${Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value)}`;
 }
 
+function compactRole(role: string) {
+  return role.length > 52 ? `${role.slice(0, 49).trim()}...` : role;
+}
+
 function CollectionCard({
   collection,
   selected,
@@ -68,12 +72,12 @@ function CollectionCard({
         />
       </div>
       <div className="dojo-collection-copy">
-        <span>{agentFamilyDisplayCode(collection.code)} Collection</span>
+        <span>{agentFamilyDisplayCode(collection.code)} collection</span>
         <strong>{collection.name}</strong>
         <p>{collection.summary}</p>
       </div>
       <div className="dojo-collection-stats">
-        <span>{itemCount} NFAs</span>
+        <span>{itemCount} agent cards</span>
         <span>Floor {moneyCompact(collection.floorUsd)}</span>
         <span>Vol {moneyCompact(collection.volumeUsd)}</span>
       </div>
@@ -86,6 +90,10 @@ function AgentCard({ agent, featured = false }: { agent: AgentServiceCard; featu
     <div className={`dojo-agent-card ${featured ? "dojo-agent-card-featured" : ""}`}>
       <div className="dojo-agent-art">
         <div className="dojo-agent-card-id">{agent.nfaId}</div>
+        <div className="dojo-agent-live-chip">
+          <span />
+          Available
+        </div>
         <div className="dojo-agent-pet-frame">
           <DojoPetAvatar
             name={agent.name}
@@ -120,13 +128,70 @@ function AgentCard({ agent, featured = false }: { agent: AgentServiceCard; featu
           <span>CR {agent.reputation.creditScore}</span>
           <span>{percent(agent.reputation.successRate)} success</span>
         </div>
-        <Link
-          href={agent.detailHref}
-          className="dojo-agent-open-cta"
-          onClick={(event) => event.stopPropagation()}
-        >
-          Open card
-        </Link>
+        <div className="dojo-agent-card-action-row">
+          <Link
+            href={agent.detailHref}
+            className="dojo-agent-open-cta"
+            onClick={(event) => event.stopPropagation()}
+          >
+            Open card
+          </Link>
+          <span>{agent.reputation.receiptsCleared} receipts</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HeroStage({ selected }: { selected: AgentServiceCard }) {
+  return (
+    <div className="dojo-shack-stage" aria-label={`${selected.name} live agent shelf`}>
+      <div className="dojo-shack-sign">
+        <span>Live shelf</span>
+        <strong>{selected.collection}</strong>
+      </div>
+
+      <div className="dojo-shack-pet-bay">
+        <div className="dojo-shack-halo" />
+        <DojoPetAvatar
+          name={selected.name}
+          workflowId={selected.avatarSeed}
+          slug={selected.slug}
+          category={selected.category}
+          creatorId={selected.lineage.parent ?? selected.lineage.root}
+          receipts={selected.reputation.receiptsCleared}
+          passRate={selected.reputation.successRate}
+          forks={selected.lineage.generation}
+          royaltyBps={selected.pricing.royaltyBps}
+          size="lg"
+        />
+      </div>
+
+      <div className="dojo-shack-card">
+        <span>{agentFamilyDisplayCode(selected.familyCode)} · {agentGenerationLabel(selected.lineage.generation)}</span>
+        <strong>{selected.name}</strong>
+        <p>{compactRole(selected.role)}</p>
+      </div>
+
+      <div className="dojo-shack-proof-row">
+        <div>
+          <span>Credit</span>
+          <strong>CR {selected.reputation.creditScore}</strong>
+        </div>
+        <div>
+          <span>Success</span>
+          <strong>{percent(selected.reputation.successRate)}</strong>
+        </div>
+        <div>
+          <span>Receipts</span>
+          <strong>{selected.reputation.receiptsCleared}</strong>
+        </div>
+      </div>
+
+      <div className="dojo-shack-action-strip">
+        <Link href={selected.runHref}>Run</Link>
+        <Link href={selected.subscribeHref}>Subscribe</Link>
+        <Link href={selected.forkHref}>Fork</Link>
       </div>
     </div>
   );
@@ -135,6 +200,10 @@ function AgentCard({ agent, featured = false }: { agent: AgentServiceCard; featu
 function AgentRail({ selected }: { selected: AgentServiceCard }) {
   return (
     <aside className="dojo-agent-inspector">
+      <div className="dojo-agent-inspector-label">
+        <span>Selected agent</span>
+        <strong>Available</strong>
+      </div>
       <div className="dojo-agent-dex-hero">
         <div className="dojo-agent-dex-avatar">
           <DojoPetAvatar
@@ -320,18 +389,24 @@ export function LandingHero(_props: LandingHeroProps) {
     <section className="dojo-marketplace dojo-agent-marketplace">
       <div className="dojo-agent-hero">
         <div className="dojo-agent-hero-copy">
-          <h1>Collect and hire agent NFAs.</h1>
+          <span className="dojo-agent-eyebrow">AgentShack marketplace</span>
+          <h1>Hire AI agents that prove their work.</h1>
           <p>
-            Browse agent collections like an NFT market. Open an NFA inside a
-            collection to inspect abilities, receipts, lineage, and service access.
+            Browse agent cards, open a service, and check abilities, receipts,
+            lineage, and reputation before you hire.
           </p>
+          <div className="dojo-agent-hero-actions">
+            <a href="#agents" className="dojo-action dojo-action-primary">Browse agents</a>
+            <Link href={selected.detailHref} className="dojo-action">Open {selected.name}</Link>
+          </div>
         </div>
+        <HeroStage selected={selected} />
       </div>
 
       <div className="dojo-market-subhead">
         <div>
           <h3>Agent collections</h3>
-          <p>{AGENT_COLLECTIONS.length} collections · {AGENT_SERVICE_CARDS.length} NFAs</p>
+          <p>{AGENT_COLLECTIONS.length} collections · {AGENT_SERVICE_CARDS.length} agent cards</p>
         </div>
       </div>
 
@@ -342,7 +417,7 @@ export function LandingHero(_props: LandingHeroProps) {
             type="text"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search collections, NFAs, abilities..."
+            placeholder="Search agents, services, abilities..."
             className="dojo-input pl-9"
           />
         </div>
@@ -370,7 +445,7 @@ export function LandingHero(_props: LandingHeroProps) {
       <div className="dojo-agent-layout">
         <div className="dojo-agent-grid">
           {collectionItems.length === 0 ? (
-            <div className="dojo-empty">No NFA cards found in this collection. Try another search.</div>
+            <div className="dojo-empty">No agent cards found in this collection. Try another search.</div>
           ) : (
             collectionItems.map((agent, index) => (
               <div

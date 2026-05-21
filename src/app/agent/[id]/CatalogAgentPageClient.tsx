@@ -35,7 +35,7 @@ function money(value: number) {
 function actionCopy(mode: string | null) {
   if (mode === "subscribe") return "Subscribe keeps this agent available for recurring merchant work.";
   if (mode === "license") return "Fork / license turns this service into your own merchant-specific version.";
-  return "Run trains this agent on one case and writes the result back as a receipt.";
+  return "Run one case, get the result, and write a receipt back to this agent card.";
 }
 
 export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
@@ -50,7 +50,7 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
       <main className="dojo-page-shell">
         <Link href="/#agents" className="dojo-back-link">
           <ArrowLeft className="w-3 h-3" />
-          Back to NFA marketplace
+          Back to AgentShack
         </Link>
 
         <section className="dojo-agent-profile">
@@ -80,13 +80,18 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
                 <span>{agentProofLevelLabel(agent.proofLevel)} proof</span>
                 <span>{agent.ownerIdentity}</span>
               </div>
+              <div className="dojo-agent-profile-loop">
+                <span>Run once</span>
+                <span>Subscribe</span>
+                <span>Fork / License</span>
+              </div>
             </div>
           </div>
 
           <section className="dojo-agent-profile-panel">
             <div className="dojo-agent-section-title">
               <ShieldCheck className="h-3.5 w-3.5" />
-              NFA identity
+              Agent identity
             </div>
             <div className="dojo-agent-nfa-strip dojo-agent-nfa-strip-wide">
               <div>
@@ -131,7 +136,7 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
             <div>
               <div className="dojo-agent-section-title">
                 <Play className="h-3.5 w-3.5 fill-current" />
-                Hire this NFA
+                Hire this agent
               </div>
               <p>{actionCopy(mode)}</p>
             </div>
@@ -214,7 +219,7 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
                 </div>
               </div>
               <p className="dojo-agent-profile-note">
-                {agent.archetype}. {agentCardStatusLabel(agent.status)}. {(agent.pricing.royaltyBps / 100).toFixed(1)}% lineage royalty. Every cleared run feeds this NFA reputation.
+                {agent.archetype}. {agentCardStatusLabel(agent.status)}. {(agent.pricing.royaltyBps / 100).toFixed(1)}% lineage royalty. Every cleared run feeds this agent card reputation.
               </p>
             </section>
           </div>

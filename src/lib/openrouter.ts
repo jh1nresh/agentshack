@@ -44,7 +44,7 @@ Generate the JSON Schema and example input.`;
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
       'HTTP-Referer': 'https://dojo.maiat.io',
-      'X-Title': 'Maiat Dojo',
+      'X-Title': 'AgentShack',
     },
     body: JSON.stringify({
       model: MODEL,

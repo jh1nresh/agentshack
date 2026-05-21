@@ -113,7 +113,7 @@ export function ChatInput({
             newspaper classified ad rather than a generic search bar. */}
         {isHero && (
           <span className="pointer-events-none absolute -top-[9px] left-4 z-10 bg-[var(--paper-bg-muted)] px-2 font-mono text-[9px] font-bold uppercase tracking-[0.25em] text-[var(--paper-ink-65)]">
-            [ Ask the Dojo ]
+            [ Ask AgentShack ]
           </span>
         )}
 

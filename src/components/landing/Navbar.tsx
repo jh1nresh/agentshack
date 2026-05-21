@@ -66,7 +66,7 @@ export function Navbar() {
           <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-[7px] border border-[var(--card-border)] bg-[#faf8f0] shadow-sm">
             <Image
               src="/brand/dojo-mantis-logo.png"
-              alt="The Dojo"
+              alt="AgentShack"
               width={32}
               height={32}
               className="h-full w-full object-cover"
@@ -75,7 +75,7 @@ export function Navbar() {
           </span>
           <span className="leading-none">
             <span className="block text-[18px] font-black tracking-tight text-[var(--text)] sm:text-[20px]">
-              The Dojo
+              AgentShack
             </span>
           </span>
         </Link>
