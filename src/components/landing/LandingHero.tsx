@@ -16,6 +16,9 @@ import { DojoPetAvatar } from "@/components/DojoPetAvatar";
 import {
   AGENT_COLLECTIONS,
   AGENT_SERVICE_CARDS,
+  agentCardLevel,
+  agentCardMood,
+  agentCardRarity,
   agentFamilyDisplayCode,
   agentGenerationLabel,
   type AgentCollection,
@@ -53,7 +56,7 @@ function CollectionCard({
   return (
     <button
       type="button"
-      className={`dojo-collection-card ${selected ? "dojo-collection-card-selected" : ""}`}
+      className={`dojo-collection-card dojo-card-pack ${selected ? "dojo-collection-card-selected" : ""}`}
       onClick={onSelect}
       aria-pressed={selected}
     >
@@ -72,12 +75,12 @@ function CollectionCard({
         />
       </div>
       <div className="dojo-collection-copy">
-        <span>{agentFamilyDisplayCode(collection.code)} collection</span>
+        <span>{agentFamilyDisplayCode(collection.code)} card pack</span>
         <strong>{collection.name}</strong>
         <p>{collection.summary}</p>
       </div>
       <div className="dojo-collection-stats">
-        <span>{itemCount} agent cards</span>
+        <span>{itemCount} cards</span>
         <span>Floor {moneyCompact(collection.floorUsd)}</span>
         <span>Vol {moneyCompact(collection.volumeUsd)}</span>
       </div>
@@ -86,13 +89,20 @@ function CollectionCard({
 }
 
 function AgentCard({ agent, featured = false }: { agent: AgentServiceCard; featured?: boolean }) {
+  const level = agentCardLevel(agent);
+  const rarity = agentCardRarity(agent);
+  const mood = agentCardMood(agent);
+  const signatureMove = agent.abilities[0] ?? agent.workflowDeck[0] ?? "Cleared work";
+
   return (
-    <div className={`dojo-agent-card ${featured ? "dojo-agent-card-featured" : ""}`}>
+    <div className={`dojo-agent-card dojo-tcg-card ${featured ? "dojo-agent-card-featured" : ""}`}>
+      <div className="dojo-foil-sheen" aria-hidden="true" />
       <div className="dojo-agent-art">
         <div className="dojo-agent-card-id">{agent.nfaId}</div>
+        <div className="dojo-rarity-strip">{rarity}</div>
         <div className="dojo-agent-live-chip">
           <span />
-          Available
+          {mood}
         </div>
         <div className="dojo-agent-pet-frame">
           <DojoPetAvatar
@@ -123,10 +133,14 @@ function AgentCard({ agent, featured = false }: { agent: AgentServiceCard; featu
         </div>
 
         <p className="dojo-agent-role">{agent.role}</p>
+        <div className="dojo-signature-move">
+          <span>Signature move</span>
+          <strong>{signatureMove}</strong>
+        </div>
         <div className="dojo-agent-card-meta" aria-label={`${agent.name} quick stats`}>
-          <span>{agentGenerationLabel(agent.lineage.generation)}</span>
+          <span>LV {level}</span>
           <span>CR {agent.reputation.creditScore}</span>
-          <span>{percent(agent.reputation.successRate)} success</span>
+          <span>{agent.reputation.receiptsCleared} receipts</span>
         </div>
         <div className="dojo-agent-card-action-row">
           <Link
@@ -144,11 +158,16 @@ function AgentCard({ agent, featured = false }: { agent: AgentServiceCard; featu
 }
 
 function HeroStage({ selected }: { selected: AgentServiceCard }) {
+  const level = agentCardLevel(selected);
+  const rarity = agentCardRarity(selected);
+  const mood = agentCardMood(selected);
+  const signatureMove = selected.abilities[0] ?? selected.workflowDeck[0] ?? "Cleared work";
+
   return (
-    <div className="dojo-shack-stage" aria-label={`${selected.name} live agent shelf`}>
+    <div className="dojo-shack-stage dojo-tcg-stage" aria-label={`${selected.name} featured agent card`}>
       <div className="dojo-shack-sign">
-        <span>Live shelf</span>
-        <strong>{selected.collection}</strong>
+        <span>Featured card</span>
+        <strong>{rarity} · LV {level}</strong>
       </div>
 
       <div className="dojo-shack-pet-bay">
@@ -168,19 +187,20 @@ function HeroStage({ selected }: { selected: AgentServiceCard }) {
       </div>
 
       <div className="dojo-shack-card">
-        <span>{agentFamilyDisplayCode(selected.familyCode)} · {agentGenerationLabel(selected.lineage.generation)}</span>
+        <span>{agentFamilyDisplayCode(selected.familyCode)} · {selected.collection} · {mood}</span>
         <strong>{selected.name}</strong>
         <p>{compactRole(selected.role)}</p>
+        <div className="dojo-shack-move">{signatureMove}</div>
       </div>
 
       <div className="dojo-shack-proof-row">
         <div>
-          <span>Credit</span>
-          <strong>CR {selected.reputation.creditScore}</strong>
+          <span>Level</span>
+          <strong>LV {level}</strong>
         </div>
         <div>
-          <span>Success</span>
-          <strong>{percent(selected.reputation.successRate)}</strong>
+          <span>Credit</span>
+          <strong>CR {selected.reputation.creditScore}</strong>
         </div>
         <div>
           <span>Receipts</span>
@@ -198,11 +218,15 @@ function HeroStage({ selected }: { selected: AgentServiceCard }) {
 }
 
 function AgentRail({ selected }: { selected: AgentServiceCard }) {
+  const level = agentCardLevel(selected);
+  const rarity = agentCardRarity(selected);
+  const mood = agentCardMood(selected);
+
   return (
     <aside className="dojo-agent-inspector">
       <div className="dojo-agent-inspector-label">
-        <span>Selected agent</span>
-        <strong>Available</strong>
+        <span>Selected card</span>
+        <strong>{rarity} · {mood}</strong>
       </div>
       <div className="dojo-agent-dex-hero">
         <div className="dojo-agent-dex-avatar">
@@ -243,6 +267,10 @@ function AgentRail({ selected }: { selected: AgentServiceCard }) {
 
       <div className="dojo-agent-dex-stats" aria-label={`${selected.name} reputation stats`}>
         <div>
+          <span>Level</span>
+          <strong>LV {level}</strong>
+        </div>
+        <div>
           <span>Credit</span>
           <strong>CR {selected.reputation.creditScore}</strong>
         </div>
@@ -274,7 +302,7 @@ function AgentRail({ selected }: { selected: AgentServiceCard }) {
       <div className="dojo-agent-dex-section dojo-agent-dex-section-primary">
         <div className="dojo-agent-section-title">
           <WalletCards className="h-3.5 w-3.5" />
-          Abilities
+          Moves
         </div>
         <div className="dojo-agent-move-list">
           {selected.abilities.map((ability, index) => (
@@ -289,7 +317,7 @@ function AgentRail({ selected }: { selected: AgentServiceCard }) {
       <div className="dojo-agent-dex-section">
         <div className="dojo-agent-section-title">
           <Layers3 className="h-3.5 w-3.5" />
-          Service deck
+          Workflow deck
         </div>
         <ol className="dojo-agent-quest-list">
           {selected.workflowDeck.map((step) => (
@@ -301,7 +329,7 @@ function AgentRail({ selected }: { selected: AgentServiceCard }) {
       <div className="dojo-agent-dex-section">
         <div className="dojo-agent-section-title">
           <ReceiptText className="h-3.5 w-3.5" />
-          Receipts
+          Care log
         </div>
         <div className="dojo-agent-receipt-stamps">
           {selected.receipts.slice(0, 3).map((receipt) => (
@@ -330,7 +358,7 @@ function AgentRail({ selected }: { selected: AgentServiceCard }) {
 
       <div className="dojo-agent-dex-note">
         <ShieldCheck className="h-3.5 w-3.5" />
-        <span>{selected.proofSummary} {(selected.pricing.royaltyBps / 100).toFixed(1)}% lineage royalty.</span>
+        <span>Every cleared receipt trains this card, improves its work history, and routes {(selected.pricing.royaltyBps / 100).toFixed(1)}% lineage royalty.</span>
       </div>
     </aside>
   );
@@ -389,11 +417,11 @@ export function LandingHero(_props: LandingHeroProps) {
     <section className="dojo-marketplace dojo-agent-marketplace">
       <div className="dojo-agent-hero">
         <div className="dojo-agent-hero-copy">
-          <span className="dojo-agent-eyebrow">AgentShack marketplace</span>
-          <h1>Hire AI agents that prove their work.</h1>
+          <span className="dojo-agent-eyebrow">AgentShack card market</span>
+          <h1>Collect working agents. Train them with receipts.</h1>
           <p>
-            Browse agent cards, open a service, and check abilities, receipts,
-            lineage, and reputation before you hire.
+            Browse card packs, open an agent service card, then run, subscribe,
+            or fork it. Every cleared job feeds the card reputation and lineage.
           </p>
           <div className="dojo-agent-hero-actions">
             <a href="#agents" className="dojo-action dojo-action-primary">Browse agents</a>
@@ -405,8 +433,8 @@ export function LandingHero(_props: LandingHeroProps) {
 
       <div className="dojo-market-subhead">
         <div>
-          <h3>Agent collections</h3>
-          <p>{AGENT_COLLECTIONS.length} collections · {AGENT_SERVICE_CARDS.length} agent cards</p>
+          <h3>Card packs</h3>
+          <p>{AGENT_COLLECTIONS.length} packs · {AGENT_SERVICE_CARDS.length} agent cards</p>
         </div>
       </div>
 

@@ -17,6 +17,9 @@ import { Footer } from "@/components/landing/Footer";
 import { Navbar } from "@/components/landing/Navbar";
 import { DojoPetAvatar } from "@/components/DojoPetAvatar";
 import {
+  agentCardLevel,
+  agentCardMood,
+  agentCardRarity,
   agentFamilyDisplayCode,
   agentGenerationLabel,
   agentProofLevelLabel,
@@ -35,12 +38,16 @@ function money(value: number) {
 function actionCopy(mode: string | null) {
   if (mode === "subscribe") return "Subscribe keeps this agent available for recurring merchant work.";
   if (mode === "license") return "Fork / license turns this service into your own merchant-specific version.";
-  return "Run one case, get the result, and write a receipt back to this agent card.";
+  return "Run one case, get the result, and feed a cleared receipt back into this agent card.";
 }
 
 export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode");
+  const level = agentCardLevel(agent);
+  const rarity = agentCardRarity(agent);
+  const mood = agentCardMood(agent);
+  const signatureMove = agent.abilities[0] ?? agent.workflowDeck[0] ?? "Cleared work";
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] transition-colors duration-700">
@@ -55,7 +62,13 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
 
         <section className="dojo-agent-profile">
           <div className="dojo-agent-profile-hero">
-            <div className="dojo-agent-profile-avatar">
+            <div className="dojo-agent-profile-card">
+              <div className="dojo-foil-sheen" aria-hidden="true" />
+              <div className="dojo-agent-profile-card-top">
+                <span>{rarity}</span>
+                <strong>LV {level}</strong>
+              </div>
+              <div className="dojo-agent-profile-avatar">
               <DojoPetAvatar
                 name={agent.name}
                 workflowId={agent.avatarSeed}
@@ -68,6 +81,12 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
                 royaltyBps={agent.pricing.royaltyBps}
                 size="lg"
               />
+              </div>
+              <div className="dojo-agent-profile-card-body">
+                <span>{agent.nfaId}</span>
+                <strong>{agent.name}</strong>
+                <p>{signatureMove}</p>
+              </div>
             </div>
 
             <div className="dojo-agent-profile-copy">
@@ -85,13 +104,27 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
                 <span>Subscribe</span>
                 <span>Fork / License</span>
               </div>
+              <div className="dojo-pet-status">
+                <div>
+                  <span>Mood</span>
+                  <strong>{mood}</strong>
+                </div>
+                <div>
+                  <span>Rarity</span>
+                  <strong>{rarity}</strong>
+                </div>
+                <div>
+                  <span>Training</span>
+                  <strong>{agent.reputation.receiptsCleared} receipts</strong>
+                </div>
+              </div>
             </div>
           </div>
 
           <section className="dojo-agent-profile-panel">
             <div className="dojo-agent-section-title">
               <ShieldCheck className="h-3.5 w-3.5" />
-              Agent identity
+              Card identity
             </div>
             <div className="dojo-agent-nfa-strip dojo-agent-nfa-strip-wide">
               <div>
@@ -114,6 +147,10 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
           </section>
 
           <div className="dojo-agent-profile-stats" aria-label={`${agent.name} agent stats`}>
+            <div>
+              <span>Level</span>
+              <strong>LV {level}</strong>
+            </div>
             <div>
               <span>Credit</span>
               <strong>CR {agent.reputation.creditScore}</strong>
@@ -160,7 +197,7 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
             <section className="dojo-agent-profile-panel">
               <div className="dojo-agent-section-title">
                 <WalletCards className="h-3.5 w-3.5" />
-                Abilities
+                Moves
               </div>
               <div className="dojo-agent-move-list">
                 {agent.abilities.map((ability, index) => (
@@ -175,7 +212,7 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
             <section className="dojo-agent-profile-panel">
               <div className="dojo-agent-section-title">
                 <Layers3 className="h-3.5 w-3.5" />
-                Service deck
+                Workflow deck
               </div>
               <ol className="dojo-agent-quest-list">
                 {agent.workflowDeck.map((step) => (
@@ -187,9 +224,9 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
             <section className="dojo-agent-profile-panel">
               <div className="dojo-agent-section-title">
                 <ReceiptText className="h-3.5 w-3.5" />
-                Proof receipts
+                Care / training log
               </div>
-              <div className="dojo-agent-receipt-stamps">
+              <div className="dojo-agent-receipt-stamps dojo-training-log">
                 {agent.receipts.map((receipt) => (
                   <div key={receipt.id}>
                     <span>{receipt.status}</span>
@@ -202,7 +239,7 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
             <section className="dojo-agent-profile-panel">
               <div className="dojo-agent-section-title">
                 <ShieldCheck className="h-3.5 w-3.5" />
-                Lineage and royalties
+                Evolution / lineage
               </div>
               <div className="dojo-agent-dex-lineage">
                 <div>
@@ -219,7 +256,7 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
                 </div>
               </div>
               <p className="dojo-agent-profile-note">
-                {agent.archetype}. {agentCardStatusLabel(agent.status)}. {(agent.pricing.royaltyBps / 100).toFixed(1)}% lineage royalty. Every cleared run feeds this agent card reputation.
+                {agent.archetype}. {agentCardStatusLabel(agent.status)}. {(agent.pricing.royaltyBps / 100).toFixed(1)}% lineage royalty. Every cleared run feeds this agent card reputation and makes future forks more valuable.
               </p>
             </section>
           </div>

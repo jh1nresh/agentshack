@@ -487,3 +487,22 @@ export function agentProofLevelLabel(level: AgentProofLevel) {
   if (level === "clearing") return "Clearing";
   return "Settlement";
 }
+
+export function agentCardLevel(agent: AgentServiceCard) {
+  const receiptLevel = Math.floor(agent.reputation.receiptsCleared / 18);
+  const generationBonus = Math.max(0, 3 - agent.lineage.generation);
+  return Math.min(99, Math.max(1, receiptLevel + generationBonus));
+}
+
+export function agentCardRarity(agent: AgentServiceCard) {
+  if (agent.lineage.generation === 0) return "Genesis";
+  if (agent.status === "verified-service" || agent.proofLevel === "settlement") return "Verified";
+  if (agent.reputation.successRate >= 0.93 || agent.reputation.creditScore >= 85) return "Rare";
+  return "Fork";
+}
+
+export function agentCardMood(agent: AgentServiceCard) {
+  if (agent.reputation.disputes > 2) return "Training";
+  if (agent.proofLevel === "clearing" || agent.proofLevel === "settlement") return "Clearing";
+  return "Ready";
+}
