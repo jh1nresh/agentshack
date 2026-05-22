@@ -1814,6 +1814,8 @@ html.dark body {
 }
 .dojo-agent-card-wrap {
   appearance: none;
+  display: flex;
+  height: 100%;
   min-width: 0;
   border: 0;
   background: transparent;
@@ -1837,6 +1839,8 @@ html.dark body {
   position: relative;
   overflow: hidden;
   display: flex;
+  width: 100%;
+  height: 100%;
   min-height: 368px;
   flex-direction: column;
   border: 1px solid var(--card-border);
@@ -2114,6 +2118,7 @@ html.dark body {
 }
 .dojo-agent-open-cta {
   display: inline-flex;
+  flex: 1 1 auto;
   min-height: 38px;
   align-items: center;
   justify-content: center;
@@ -2132,12 +2137,23 @@ html.dark body {
   transform: translateY(-1px);
 }
 .dojo-agent-card-action-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
+  margin-top: 2px;
+  min-width: 0;
 }
 .dojo-agent-card-action-row span {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  background: rgba(255,255,250,0.56);
+  padding: 7px 9px;
   color: var(--text-muted);
   font-size: 9px;
   font-weight: 850;
@@ -2238,12 +2254,16 @@ html.dark body {
 }
 .dojo-agent-detail-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+.dojo-agent-detail-actions .dojo-action {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 10px;
 }
 .dojo-agent-detail-actions .dojo-action:not(.dojo-action-primary) {
   justify-content: center;
-  padding-inline: 10px;
 }
 .dojo-agent-inspector {
   position: sticky;
@@ -2743,13 +2763,18 @@ html.dark body {
   padding: 18px;
 }
 .dojo-agent-profile-panel[id="run"] {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.88fr);
   align-items: center;
 }
 .dojo-agent-profile-actions {
   display: grid;
-  grid-template-columns: repeat(3, auto);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+.dojo-agent-profile-actions .dojo-action {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 10px;
 }
 .dojo-agent-profile-grid {
   display: grid;
@@ -3104,6 +3129,12 @@ html.dark body {
   }
   .dojo-agent-grid {
     grid-template-columns: 1fr;
+  }
+  .dojo-agent-card-action-row {
+    grid-template-columns: 1fr;
+  }
+  .dojo-agent-card-action-row span {
+    text-align: center;
   }
   .dojo-agent-art {
     min-height: 220px;
