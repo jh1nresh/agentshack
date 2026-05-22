@@ -91,6 +91,21 @@ export type AgentServiceCard = {
   receiptsHref: string;
 };
 
+export type AgentTrustStackItem = {
+  label: "Identity" | "Mandate" | "Track record" | "Data layer";
+  value: string;
+  summary: string;
+  evidence: string[];
+};
+
+export type AgentOfferItem = {
+  mode: "run" | "setup" | "subscribe" | "license";
+  label: string;
+  price: string;
+  summary: string;
+  receipt: string;
+};
+
 export const AGENT_FAMILIES: AgentFamily[] = [
   {
     code: "NEG",
@@ -505,4 +520,89 @@ export function agentCardMood(agent: AgentServiceCard) {
   if (agent.reputation.disputes > 2) return "Training";
   if (agent.proofLevel === "clearing" || agent.proofLevel === "settlement") return "Clearing";
   return "Ready";
+}
+
+export function agentTrustStack(agent: AgentServiceCard): AgentTrustStackItem[] {
+  const latestReceipt = agent.receipts[0];
+  const lineageLabel = agent.lineage.parent
+    ? `${agent.lineage.parent} -> ${agent.name}`
+    : `${agent.name} genesis`;
+
+  return [
+    {
+      label: "Identity",
+      value: agent.agentId,
+      summary: "Who owns this agent card and where its portable identity resolves.",
+      evidence: [
+        `Owner: ${agent.ownerIdentity}`,
+        `Family: ${agentFamilyDisplayCode(agent.familyCode)} / ${agentGenerationLabel(agent.lineage.generation)}`,
+        `Proof: ${agentProofLevelLabel(agent.proofLevel)}`,
+      ],
+    },
+    {
+      label: "Mandate",
+      value: `${agent.abilities.length} scoped moves`,
+      summary: "What this agent is allowed to do before a buyer hires, subscribes, or forks it.",
+      evidence: [
+        `Services: ${agent.abilities.slice(0, 3).join(", ")}`,
+        "Setup: context, data, first workflow",
+        `Rails: ${agent.paymentRails.join(", ")}`,
+        `Royalty: ${(agent.pricing.royaltyBps / 100).toFixed(1)}% lineage`,
+      ],
+    },
+    {
+      label: "Track record",
+      value: `${agent.reputation.receiptsCleared} receipts`,
+      summary: "Cleared work history that helps buyers predict how this agent behaves.",
+      evidence: [
+        `Success: ${Math.round(agent.reputation.successRate * 100)}%`,
+        `Disputes: ${agent.reputation.disputes}`,
+        `Volume: $${agent.reputation.verifiedVolumeUsd.toLocaleString()}`,
+      ],
+    },
+    {
+      label: "Data layer",
+      value: latestReceipt?.id ?? "No receipts yet",
+      summary: "Machine-readable receipt and lineage data that can feed reputation systems.",
+      evidence: [
+        `Evidence: ${agent.receiptKinds.join(", ")}`,
+        "Setup receipt: context captured / workflow mapped",
+        `Latest: ${latestReceipt ? `${latestReceipt.label} / ${latestReceipt.status}` : "Pending first receipt"}`,
+        `Lineage: ${lineageLabel}`,
+      ],
+    },
+  ];
+}
+
+export function agentOfferStack(agent: AgentServiceCard): AgentOfferItem[] {
+  return [
+    {
+      mode: "run",
+      label: "Run once",
+      price: `$${agent.pricing.perClearedCaseUsd.toFixed(2)} / cleared case`,
+      summary: "Use this agent for one job and receive the result plus a receipt.",
+      receipt: "Result accepted, evaluated, and added to the training log.",
+    },
+    {
+      mode: "setup",
+      label: "Setup session",
+      price: agent.pricing.setupFeeUsd > 0 ? `$${agent.pricing.setupFeeUsd} guided setup` : "Free setup path",
+      summary: "Book an operator hour to connect this agent to your business context.",
+      receipt: "Context captured, workflow mapped, first run configured, next step agreed.",
+    },
+    {
+      mode: "subscribe",
+      label: "Subscribe",
+      price: agent.pricing.monthlyUsd > 0 ? `$${agent.pricing.monthlyUsd} / month` : "Usage based",
+      summary: "Keep this agent available for recurring merchant or review work.",
+      receipt: "Recurring cleared work compounds credit and reliability history.",
+    },
+    {
+      mode: "license",
+      label: "Fork / License",
+      price: `${(agent.pricing.royaltyBps / 100).toFixed(1)}% lineage royalty`,
+      summary: "Turn this service card into your own vertical or merchant version.",
+      receipt: "Fork lineage records who improved the agent and who earns royalties.",
+    },
+  ];
 }

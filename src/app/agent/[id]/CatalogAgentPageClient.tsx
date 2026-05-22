@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
+  CalendarCheck,
   GitFork,
   Layers3,
   Play,
@@ -22,8 +23,10 @@ import {
   agentCardRarity,
   agentFamilyDisplayCode,
   agentGenerationLabel,
+  agentOfferStack,
   agentProofLevelLabel,
   agentCardStatusLabel,
+  agentTrustStack,
   type AgentServiceCard,
 } from "@/lib/agent-card-catalog";
 
@@ -36,6 +39,7 @@ function money(value: number) {
 }
 
 function actionCopy(mode: string | null) {
+  if (mode === "setup") return "Setup session is the rung-zero path: a guided hour to connect this agent to a real business workflow.";
   if (mode === "subscribe") return "Subscribe keeps this agent available for recurring merchant work.";
   if (mode === "license") return "Fork / license turns this service into your own merchant-specific version.";
   return "Run one case, get the result, and feed a cleared receipt back into this agent card.";
@@ -48,6 +52,8 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
   const rarity = agentCardRarity(agent);
   const mood = agentCardMood(agent);
   const signatureMove = agent.abilities[0] ?? agent.workflowDeck[0] ?? "Cleared work";
+  const trustStack = agentTrustStack(agent);
+  const offerStack = agentOfferStack(agent);
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] transition-colors duration-700">
@@ -101,6 +107,7 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
               </div>
               <div className="dojo-agent-profile-loop">
                 <span>Run once</span>
+                <span>Setup session</span>
                 <span>Subscribe</span>
                 <span>Fork / License</span>
               </div>
@@ -146,6 +153,39 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
             </div>
           </section>
 
+          <section className="dojo-agent-profile-panel dojo-trust-stack-panel" aria-labelledby="trust-stack-title">
+            <div className="dojo-trust-stack-head">
+              <div>
+                <div id="trust-stack-title" className="dojo-agent-section-title">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Trust stack
+                </div>
+                <p>
+                  Before hiring this agent, read its identity, mandate, work history, and receipt data in one place.
+                </p>
+              </div>
+              <span>{agentProofLevelLabel(agent.proofLevel)} proof</span>
+            </div>
+
+            <div className="dojo-trust-stack-grid">
+              {trustStack.map((item, index) => (
+                <article key={item.label} className="dojo-trust-stack-card">
+                  <div className="dojo-trust-stack-card-top">
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <strong>{item.label}</strong>
+                  </div>
+                  <h3>{item.value}</h3>
+                  <p>{item.summary}</p>
+                  <ul>
+                    {item.evidence.map((line) => (
+                      <li key={`${item.label}-${line}`}>{line}</li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
+            </div>
+          </section>
+
           <div className="dojo-agent-profile-stats" aria-label={`${agent.name} agent stats`}>
             <div>
               <span>Level</span>
@@ -178,18 +218,32 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
               <p>{actionCopy(mode)}</p>
             </div>
             <div className="dojo-agent-profile-actions">
-              <Link href={`${agent.detailHref}?mode=run#run`} className="dojo-action dojo-action-primary">
-                <Play className="h-3.5 w-3.5 fill-current" />
-                Run once
-              </Link>
-              <Link href={`${agent.detailHref}?mode=subscribe#run`} className="dojo-action">
-                <Repeat2 className="h-3.5 w-3.5" />
-                Subscribe
-              </Link>
-              <Link href={`${agent.detailHref}?mode=license#run`} className="dojo-action">
-                <GitFork className="h-3.5 w-3.5" />
-                Fork / License
-              </Link>
+              {offerStack.map((offer) => {
+                const href = `${agent.detailHref}?mode=${offer.mode}#run`;
+                const Icon = offer.mode === "run"
+                  ? Play
+                  : offer.mode === "setup"
+                    ? CalendarCheck
+                    : offer.mode === "subscribe"
+                      ? Repeat2
+                      : GitFork;
+
+                return (
+                  <Link
+                    key={offer.mode}
+                    href={href}
+                    className={`dojo-agent-offer ${mode === offer.mode || (!mode && offer.mode === "run") ? "dojo-agent-offer-active" : ""}`}
+                  >
+                    <span className="dojo-agent-offer-top">
+                      <Icon className={offer.mode === "run" ? "h-3.5 w-3.5 fill-current" : "h-3.5 w-3.5"} />
+                      <strong>{offer.label}</strong>
+                    </span>
+                    <span className="dojo-agent-offer-price">{offer.price}</span>
+                    <span className="dojo-agent-offer-copy">{offer.summary}</span>
+                    <span className="dojo-agent-offer-receipt">{offer.receipt}</span>
+                  </Link>
+                );
+              })}
             </div>
           </section>
 
