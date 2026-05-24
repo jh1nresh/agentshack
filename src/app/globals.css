@@ -1241,18 +1241,21 @@ html.dark body {
 .dojo-pet-avatar[data-belt="yellow belt"] .dojo-pet-belt {
   background: var(--dojo-gold);
 }
-.dojo-pixel-pet {
+.dojo-illustrated-pet {
   display: block;
   height: 100%;
   width: 100%;
-  image-rendering: pixelated;
-  filter: drop-shadow(0 2px 0 rgba(11, 12, 14, 0.16));
+  overflow: visible;
+  filter: drop-shadow(0 3px 0 rgba(11, 12, 14, 0.14));
 }
-.dojo-pet-avatar[data-kind="sage"] .dojo-pixel-pet {
+.dojo-illustrated-pet path {
+  vector-effect: non-scaling-stroke;
+}
+.dojo-pet-avatar[data-kind="sage"] .dojo-illustrated-pet {
   transform: translateY(-2%);
 }
-.dojo-pet-avatar[data-kind="horned"] .dojo-pixel-pet,
-.dojo-pet-avatar[data-kind="crest"] .dojo-pixel-pet {
+.dojo-pet-avatar[data-kind="horned"] .dojo-illustrated-pet,
+.dojo-pet-avatar[data-kind="crest"] .dojo-illustrated-pet {
   transform: translateY(-3%);
 }
 .dojo-catalog-badge,
@@ -3187,13 +3190,13 @@ html.dark body {
 .dojo-shack-stage {
   min-height: 420px;
   background:
-    radial-gradient(circle at 18% 27%, rgba(255, 217, 102, 0.55), transparent 8%),
-    radial-gradient(circle at 78% 28%, rgba(245, 141, 180, 0.45), transparent 7%),
-    radial-gradient(circle at 50% 46%, rgba(130, 220, 196, 0.28), transparent 34%),
-    linear-gradient(90deg, rgba(22,18,15,0.075) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(22,18,15,0.06) 1px, transparent 1px),
+    radial-gradient(circle at 18% 27%, rgba(255, 217, 102, 0.48), transparent 8%),
+    radial-gradient(circle at 78% 28%, rgba(245, 141, 180, 0.34), transparent 7%),
+    radial-gradient(circle at 50% 46%, rgba(130, 220, 196, 0.24), transparent 34%),
+    linear-gradient(115deg, transparent 0 42%, rgba(22,18,15,0.045) 42% 43%, transparent 43% 100%),
+    linear-gradient(25deg, transparent 0 58%, rgba(22,18,15,0.035) 58% 59%, transparent 59% 100%),
     #fffdf4;
-  background-size: auto, auto, auto, 24px 24px, 24px 24px, auto;
+  background-size: auto, auto, auto, 96px 96px, 120px 120px, auto;
 }
 .dojo-shack-stage::before {
   display: none;
@@ -3228,10 +3231,10 @@ html.dark body {
 .dojo-collection-card {
   grid-template-columns: 132px minmax(0, 1fr);
   background:
-    linear-gradient(90deg, rgba(22,18,15,0.055) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(22,18,15,0.045) 1px, transparent 1px),
+    radial-gradient(circle at 14% 18%, rgba(255,255,255,0.82) 0 4px, transparent 5px),
+    linear-gradient(115deg, transparent 0 48%, rgba(22,18,15,0.045) 48% 49%, transparent 49% 100%),
     #fffdf4;
-  background-size: 22px 22px, 22px 22px, auto;
+  background-size: auto, 110px 110px, auto;
 }
 .dojo-card-pack::after {
   width: 8px;
@@ -3275,10 +3278,10 @@ html.dark body {
   border-bottom: 2px solid var(--fantasy-ink);
   background-image:
     radial-gradient(circle at 16% 22%, rgba(255,255,255,0.9) 0 5px, transparent 6px),
-    radial-gradient(circle at 86% 34%, rgba(255,255,255,0.85) 0 5px, transparent 6px),
-    linear-gradient(90deg, rgba(22,18,15,0.05) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(22,18,15,0.04) 1px, transparent 1px);
-  background-size: auto, auto, 24px 24px, 24px 24px;
+    radial-gradient(circle at 86% 34%, rgba(255,255,255,0.78) 0 5px, transparent 6px),
+    linear-gradient(125deg, rgba(255,255,255,0.34), transparent 52%),
+    radial-gradient(circle at 50% 120%, rgba(22,18,15,0.12), transparent 44%);
+  background-size: auto, auto, auto, auto;
 }
 .dojo-agent-art::before,
 .dojo-agent-art::after {
@@ -3498,10 +3501,11 @@ html.dark body {
 }
 .dark .dojo-shack-stage {
   background:
-    linear-gradient(90deg, rgba(229,188,101,0.055) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(229,188,101,0.045) 1px, transparent 1px),
+    linear-gradient(115deg, transparent 0 42%, rgba(229,188,101,0.05) 42% 43%, transparent 43% 100%),
+    linear-gradient(25deg, transparent 0 58%, rgba(117,211,154,0.04) 58% 59%, transparent 59% 100%),
     radial-gradient(circle at 50% 42%, rgba(117,211,154,0.14), transparent 31%),
     linear-gradient(180deg, rgba(24,31,22,0.94), rgba(9,12,8,0.9));
+  background-size: 96px 96px, 120px 120px, auto, auto;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 24px 70px rgba(0,0,0,0.38);
 }
 .dark .dojo-shack-sign,
@@ -3531,8 +3535,8 @@ html.dark body {
 .dark .dojo-collection-cover {
   border-color: rgba(248,240,223,0.12);
   background:
-    linear-gradient(rgba(229,188,101,0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(229,188,101,0.055) 1px, transparent 1px),
+    radial-gradient(circle at 32% 26%, rgba(229,188,101,0.1), transparent 28%),
+    linear-gradient(125deg, rgba(248,240,223,0.04), transparent 46%),
     rgba(9,12,8,0.92);
 }
 .dark .dojo-collection-stats span {
@@ -3540,8 +3544,8 @@ html.dark body {
 }
 .dark .dojo-agent-art {
   background:
-    linear-gradient(90deg, rgba(117,211,154,0.07) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(240,138,93,0.06) 1px, transparent 1px),
+    radial-gradient(circle at 16% 22%, rgba(248,240,223,0.08), transparent 8%),
+    radial-gradient(circle at 84% 34%, rgba(229,188,101,0.08), transparent 9%),
     linear-gradient(135deg, rgba(248,240,223,0.035), transparent 52%),
     rgba(9,12,8,0.92);
 }
@@ -3945,19 +3949,17 @@ html.dark body {
   border: 2px solid var(--text);
   border-radius: 8px;
   background:
-    linear-gradient(90deg, rgba(22,95,67,0.16) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(22,95,67,0.16) 1px, transparent 1px),
+    radial-gradient(circle at 30% 24%, rgba(255,255,255,0.32), transparent 26%),
+    linear-gradient(130deg, rgba(22,95,67,0.12), transparent 52%),
     var(--spirit-mat);
-  background-size: 7px 7px;
   box-shadow:
     inset 0 -8px 0 rgba(11, 12, 14, 0.08),
     0 0 0 3px rgba(166, 122, 43, 0.12);
-  image-rendering: pixelated;
 }
 .dark .dojo-spirit-screen {
   background:
-    linear-gradient(90deg, rgba(245,241,232,0.075) 1px, transparent 1px),
-    linear-gradient(0deg, rgba(245,241,232,0.075) 1px, transparent 1px),
+    radial-gradient(circle at 30% 24%, rgba(245,241,232,0.08), transparent 26%),
+    linear-gradient(130deg, rgba(245,241,232,0.06), transparent 52%),
     color-mix(in srgb, var(--spirit-mat) 72%, #070906);
   border-color: rgba(245,241,232,0.74);
   box-shadow:
