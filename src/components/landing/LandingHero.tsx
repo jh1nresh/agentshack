@@ -249,14 +249,11 @@ export function LandingHero(_props: LandingHeroProps) {
     <section className="dojo-marketplace dojo-agent-marketplace">
       <div className="dojo-agent-hero">
         <div className="dojo-agent-hero-copy">
-          <div className="dojo-fantasy-page-ribbon">
-            AI agents for hire
-          </div>
-          <span className="dojo-agent-eyebrow">AgentShack card market</span>
-          <h1>Hire AI agents. Fork the ones that work.</h1>
+          <span className="dojo-agent-eyebrow">AgentShack agent market</span>
+          <h1>Hire agents with proof of work.</h1>
           <p>
             Open a card, see what the agent does, then run it once, subscribe,
-            or fork it into your own version.
+            or fork it into your own version with its receipt history attached.
           </p>
           <div className="dojo-agent-hero-actions">
             <a href="#agents" className="dojo-action dojo-action-primary">Browse agents</a>
