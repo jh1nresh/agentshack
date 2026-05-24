@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
 import { Download, Loader2, Lock, Check, Copy } from 'lucide-react'
 
@@ -24,14 +24,7 @@ export default function DownloadSkillButton({
   const [errorMsg, setErrorMsg] = useState('')
   const [copied, setCopied] = useState(false)
 
-  // Check purchase status on mount if authenticated
-  useEffect(() => {
-    if (ready && authenticated && user) {
-      checkAccess()
-    }
-  }, [ready, authenticated, user])
-
-  const checkAccess = async () => {
+  const checkAccess = useCallback(async () => {
     if (!user) return
     setStatus('checking')
     setErrorMsg('')
@@ -57,7 +50,14 @@ export default function DownloadSkillButton({
       setStatus('error')
       setErrorMsg(err instanceof Error ? err.message : 'Failed to check access')
     }
-  }
+  }, [skillId, user])
+
+  // Check purchase status on mount if authenticated
+  useEffect(() => {
+    if (ready && authenticated && user) {
+      checkAccess()
+    }
+  }, [ready, authenticated, user, checkAccess])
 
   const handleDownload = async () => {
     if (!user) return

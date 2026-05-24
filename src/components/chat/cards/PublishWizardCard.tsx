@@ -230,6 +230,7 @@ export function PublishWizardCard() {
     authHeader,
     inputSchema,
     exampleInput,
+    user?.id,
   ]);
 
   // Auth gate
