@@ -19,14 +19,9 @@ import { Navbar } from "@/components/landing/Navbar";
 import { DojoPetAvatar } from "@/components/DojoPetAvatar";
 import {
   agentCardLevel,
-  agentCardMood,
-  agentCardRarity,
   agentFamilyDisplayCode,
   agentGenerationLabel,
   agentOfferStack,
-  agentProofLevelLabel,
-  agentCardStatusLabel,
-  agentTrustStack,
   type AgentServiceCard,
 } from "@/lib/agent-card-catalog";
 
@@ -49,10 +44,7 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
   const searchParams = useSearchParams();
   const mode = searchParams.get("mode");
   const level = agentCardLevel(agent);
-  const rarity = agentCardRarity(agent);
-  const mood = agentCardMood(agent);
   const signatureMove = agent.abilities[0] ?? agent.workflowDeck[0] ?? "Cleared work";
-  const trustStack = agentTrustStack(agent);
   const offerStack = agentOfferStack(agent);
 
   return (
@@ -71,8 +63,8 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
             <div className="dojo-agent-profile-card">
               <div className="dojo-foil-sheen" aria-hidden="true" />
               <div className="dojo-agent-profile-card-top">
-                <span>{rarity}</span>
-                <strong>LV {level}</strong>
+                <span>Agent</span>
+                <strong>{agent.reputation.receiptsCleared} receipts</strong>
               </div>
               <div className="dojo-agent-profile-avatar">
               <DojoPetAvatar
@@ -96,95 +88,30 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
             </div>
 
             <div className="dojo-agent-profile-copy">
-              <span>{agentFamilyDisplayCode(agent.familyCode)} · {agentGenerationLabel(agent.lineage.generation)} · {agent.nfaId}</span>
+              <span>{agentFamilyDisplayCode(agent.familyCode)} · {agentGenerationLabel(agent.lineage.generation)}</span>
               <h1>{agent.name}</h1>
               <p>{agent.summary}</p>
-              <div className="dojo-agent-card-meta">
-                <span>{agent.familyName}</span>
-                <span>{agentGenerationLabel(agent.lineage.generation)}</span>
-                <span>{agentProofLevelLabel(agent.proofLevel)} proof</span>
-                <span>{agent.ownerIdentity}</span>
-              </div>
               <div className="dojo-agent-profile-loop">
                 <span>Run once</span>
-                <span>Setup session</span>
                 <span>Subscribe</span>
-                <span>Fork / License</span>
+                <span>Fork</span>
               </div>
               <div className="dojo-pet-status">
                 <div>
-                  <span>Mood</span>
-                  <strong>{mood}</strong>
+                  <span>Does</span>
+                  <strong>{signatureMove}</strong>
                 </div>
                 <div>
-                  <span>Rarity</span>
-                  <strong>{rarity}</strong>
-                </div>
-                <div>
-                  <span>Training</span>
+                  <span>Work history</span>
                   <strong>{agent.reputation.receiptsCleared} receipts</strong>
+                </div>
+                <div>
+                  <span>Cleared</span>
+                  <strong>{percent(agent.reputation.successRate)}</strong>
                 </div>
               </div>
             </div>
           </div>
-
-          <section className="dojo-agent-profile-panel">
-            <div className="dojo-agent-section-title">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              Card identity
-            </div>
-            <div className="dojo-agent-nfa-strip dojo-agent-nfa-strip-wide">
-              <div>
-                <span>AgentID</span>
-                <strong>{agent.agentId}</strong>
-              </div>
-              <div>
-                <span>Family</span>
-                <strong>{agentFamilyDisplayCode(agent.familyCode)}</strong>
-              </div>
-              <div>
-                <span>Family role</span>
-                <strong>{agent.familyRole}</strong>
-              </div>
-              <div>
-                <span>Proof summary</span>
-                <strong>{agent.proofSummary}</strong>
-              </div>
-            </div>
-          </section>
-
-          <section className="dojo-agent-profile-panel dojo-trust-stack-panel" aria-labelledby="trust-stack-title">
-            <div className="dojo-trust-stack-head">
-              <div>
-                <div id="trust-stack-title" className="dojo-agent-section-title">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  Trust stack
-                </div>
-                <p>
-                  Before hiring this agent, read its identity, mandate, work history, and receipt data in one place.
-                </p>
-              </div>
-              <span>{agentProofLevelLabel(agent.proofLevel)} proof</span>
-            </div>
-
-            <div className="dojo-trust-stack-grid">
-              {trustStack.map((item, index) => (
-                <article key={item.label} className="dojo-trust-stack-card">
-                  <div className="dojo-trust-stack-card-top">
-                    <span>{String(index + 1).padStart(2, "0")}</span>
-                    <strong>{item.label}</strong>
-                  </div>
-                  <h3>{item.value}</h3>
-                  <p>{item.summary}</p>
-                  <ul>
-                    {item.evidence.map((line) => (
-                      <li key={`${item.label}-${line}`}>{line}</li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
-            </div>
-          </section>
 
           <div className="dojo-agent-profile-stats" aria-label={`${agent.name} agent stats`}>
             <div>
@@ -310,7 +237,7 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
                 </div>
               </div>
               <p className="dojo-agent-profile-note">
-                {agent.archetype}. {agentCardStatusLabel(agent.status)}. {(agent.pricing.royaltyBps / 100).toFixed(1)}% lineage royalty. Every cleared run feeds this agent card reputation and makes future forks more valuable.
+                {agent.archetype}. Forks route {(agent.pricing.royaltyBps / 100).toFixed(1)}% lineage royalty back to the original agent.
               </p>
             </section>
           </div>
