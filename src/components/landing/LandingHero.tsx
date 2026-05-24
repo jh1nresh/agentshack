@@ -97,6 +97,12 @@ function AgentCard({ agent, featured = false }: { agent: AgentServiceCard; featu
   return (
     <div className={`dojo-agent-card dojo-tcg-card ${featured ? "dojo-agent-card-featured" : ""}`}>
       <div className="dojo-foil-sheen" aria-hidden="true" />
+      <div className="dojo-agent-card-corners" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+        <span />
+      </div>
       <div className="dojo-agent-art">
         <div className="dojo-agent-card-id">{agent.nfaId}</div>
         <div className="dojo-rarity-strip">{rarity}</div>
@@ -125,6 +131,10 @@ function AgentCard({ agent, featured = false }: { agent: AgentServiceCard; featu
       </div>
 
       <div className="dojo-agent-body">
+        <div className="dojo-agent-edition">
+          <span>{agentFamilyDisplayCode(agent.familyCode)} card</span>
+          <span>{agentGenerationLabel(agent.lineage.generation)}</span>
+        </div>
         <div className="dojo-agent-title-row">
           <div className="min-w-0">
             <p className="dojo-agent-collection">{agent.collection}</p>
@@ -138,9 +148,18 @@ function AgentCard({ agent, featured = false }: { agent: AgentServiceCard; featu
           <strong>{signatureMove}</strong>
         </div>
         <div className="dojo-agent-card-meta" aria-label={`${agent.name} quick stats`}>
-          <span>LV {level}</span>
-          <span>CR {agent.reputation.creditScore}</span>
-          <span>{agent.reputation.receiptsCleared} receipts</span>
+          <span>
+            <small>Level</small>
+            <strong>LV {level}</strong>
+          </span>
+          <span>
+            <small>Credit</small>
+            <strong>CR {agent.reputation.creditScore}</strong>
+          </span>
+          <span>
+            <small>Proof</small>
+            <strong>{agent.reputation.receiptsCleared}</strong>
+          </span>
         </div>
         <div className="dojo-agent-card-action-row">
           <Link
@@ -150,7 +169,7 @@ function AgentCard({ agent, featured = false }: { agent: AgentServiceCard; featu
           >
             Open card
           </Link>
-          <span>{agent.reputation.receiptsCleared} receipts</span>
+          <span>Receipt log</span>
         </div>
       </div>
     </div>
@@ -165,6 +184,13 @@ function HeroStage({ selected }: { selected: AgentServiceCard }) {
 
   return (
     <div className="dojo-shack-stage dojo-tcg-stage" aria-label={`${selected.name} featured agent card`}>
+      <div className="dojo-fantasy-ribbon" aria-hidden="true">
+        AgentShack
+      </div>
+      <span className="dojo-doodle dojo-doodle-star dojo-doodle-star-left" aria-hidden="true" />
+      <span className="dojo-doodle dojo-doodle-star dojo-doodle-star-right" aria-hidden="true" />
+      <span className="dojo-doodle dojo-doodle-leaf dojo-doodle-leaf-left" aria-hidden="true" />
+      <span className="dojo-doodle dojo-doodle-leaf dojo-doodle-leaf-right" aria-hidden="true" />
       <div className="dojo-shack-sign">
         <span>Featured card</span>
         <strong>{rarity} · LV {level}</strong>
@@ -417,6 +443,9 @@ export function LandingHero(_props: LandingHeroProps) {
     <section className="dojo-marketplace dojo-agent-marketplace">
       <div className="dojo-agent-hero">
         <div className="dojo-agent-hero-copy">
+          <div className="dojo-fantasy-page-ribbon">
+            Working agent cards
+          </div>
           <span className="dojo-agent-eyebrow">AgentShack card market</span>
           <h1>Collect working agents. Train them with receipts.</h1>
           <p>
