@@ -25,6 +25,8 @@ import SkillSandbox from '@/components/SkillSandbox';
 import SkillExecutor from '@/components/skill/SkillExecutor';
 import ReviewSection from '@/components/ReviewSection';
 import ReviewForm from '@/components/ReviewForm';
+import { CapabilityManifestPanel } from '@/components/workflow/CapabilityManifestPanel';
+import { createSkillCapabilityManifest } from '@/lib/workflow-capabilities';
 import type { SkillMaturity } from '@/lib/skill-maturity';
 
 const PurchaseCard = dynamic(() => import('@/components/PurchaseCard'), { ssr: false });
@@ -243,6 +245,7 @@ export default function SkillPageClient({
           result: `${skill.name} returns a structured ${skill.outputShape ?? 'JSON'} response.`,
           receipt: 'Paid runs also create a workflow receipt.',
         };
+  const capabilityManifest = createSkillCapabilityManifest(skill);
 
   useEffect(() => {
     if (!authenticated || !user) return;
@@ -294,7 +297,11 @@ export default function SkillPageClient({
               <div className="mt-6 flex flex-wrap gap-3">
                 <a href="#run-workflow" className="dojo-action dojo-action-primary">
                   <Play className="h-4 w-4 fill-current" />
-                  Train skill
+                  Run once safely
+                </a>
+                <a href="#permission-manifest" className="dojo-action">
+                  <ShieldCheck className="h-4 w-4" />
+                  Inspect permissions
                 </a>
               </div>
             </div>
@@ -366,7 +373,7 @@ export default function SkillPageClient({
                     {
                       icon: Zap,
                       label: 'Process',
-                      body: 'Dojo sends the request to the workflow endpoint and checks delivery.',
+                      body: 'AgentShack runs the workflow in a bounded session; local install stays off by default.',
                     },
                     {
                       icon: FileOutput,
@@ -386,6 +393,10 @@ export default function SkillPageClient({
                   ))}
                 </div>
               </section>
+
+              <div id="permission-manifest">
+                <CapabilityManifestPanel manifest={capabilityManifest} />
+              </div>
 
               <section className="glass-card p-8">
                 <div className="mb-5 flex items-center justify-between">
@@ -412,7 +423,7 @@ export default function SkillPageClient({
                 <section id="run-workflow" className="glass-card p-8">
                   <div className="mb-5 flex items-center justify-between">
                     <div className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--text-muted)]">
-                      Train skill
+                      Run once safely
                     </div>
                     <span className="font-mono text-[11px] text-[var(--text-muted)]">
                       {skill.estLatencyMs ? `${skill.estLatencyMs}ms est.` : 'Live endpoint'}
@@ -482,6 +493,21 @@ export default function SkillPageClient({
                   fileContent: skill.fileContent,
                 }}
               />
+
+              <div className="glass-card p-7">
+                <div className="font-mono text-[9px] uppercase tracking-[0.15em] mb-5 text-[var(--text-muted)]">
+                  Install safety
+                </div>
+                <p className="mb-4 text-[13px] leading-relaxed text-[var(--text-secondary)]">
+                  AgentShack should clear the run before it mutates your environment. Treat local install,
+                  slash commands, cron jobs, MCP registration, and config writes as approval events.
+                </p>
+                <div className="space-y-3 rounded-[8px] border border-[var(--border-light)] bg-[var(--bg-secondary)] p-4 font-mono text-[11px] text-[var(--text-secondary)]">
+                  <div><strong className="text-[var(--text)]">Before:</strong> preview, sandbox, run once, receipt.</div>
+                  <div><strong className="text-[var(--text)]">After approval:</strong> install file, command, schedule, or config change.</div>
+                  <div><strong className="text-[var(--text)]">Rollback:</strong> install receipt should list what to remove.</div>
+                </div>
+              </div>
 
               <div className="glass-card p-7">
                 <div className="font-mono text-[9px] uppercase tracking-[0.15em] mb-5 text-[var(--text-muted)]">

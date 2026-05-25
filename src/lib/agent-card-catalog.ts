@@ -578,9 +578,9 @@ export function agentOfferStack(agent: AgentServiceCard): AgentOfferItem[] {
   return [
     {
       mode: "run",
-      label: "Run once",
+      label: "Run once safely",
       price: `$${agent.pricing.perClearedCaseUsd.toFixed(2)} / cleared case`,
-      summary: "Use this agent for one job and receive the result plus a receipt.",
+      summary: "Use this agent for one bounded job before installing anything locally.",
       receipt: "Result accepted, evaluated, and added to the training log.",
     },
     {
@@ -594,14 +594,14 @@ export function agentOfferStack(agent: AgentServiceCard): AgentOfferItem[] {
       mode: "subscribe",
       label: "Subscribe",
       price: agent.pricing.monthlyUsd > 0 ? `$${agent.pricing.monthlyUsd} / month` : "Usage based",
-      summary: "Keep this agent available for recurring merchant or review work.",
+      summary: "Keep this agent available after schedule and permission approval.",
       receipt: "Recurring cleared work compounds credit and reliability history.",
     },
     {
       mode: "license",
       label: "Fork / License",
       price: `${(agent.pricing.royaltyBps / 100).toFixed(1)}% lineage royalty`,
-      summary: "Turn this service card into your own vertical or merchant version.",
+      summary: "Turn this service card into your own version after reviewing capabilities.",
       receipt: "Fork lineage records who improved the agent and who earns royalties.",
     },
   ];

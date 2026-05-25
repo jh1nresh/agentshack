@@ -130,7 +130,7 @@ export default function DownloadSkillButton({
     return (
       <div className="flex items-center gap-2 text-[var(--paper-ink-40)] font-mono text-xs">
         <Lock size={12} />
-        Purchase to download skill instructions
+        Purchase to preview and download skill instructions
       </div>
     )
   }
@@ -156,12 +156,12 @@ export default function DownloadSkillButton({
         {/* Installation instructions */}
         <div className="p-3 bg-[var(--paper-ink-5)] border border-[var(--paper-ink-10)] font-mono text-xs">
           <p className="text-[var(--paper-ink-70)] mb-2">
-            <strong>To install:</strong>
+            <strong>Install only after approval:</strong>
           </p>
           <ol className="list-decimal list-inside space-y-1 text-[var(--paper-ink-60)]">
-            <li>Open your agent&apos;s skill directory</li>
+            <li>Review what the skill can read, write, and call</li>
             <li>Paste the downloaded file</li>
-            <li>Reload your agent to activate</li>
+            <li>Reload your agent only when you approve the local change</li>
           </ol>
         </div>
 
@@ -207,7 +207,7 @@ export default function DownloadSkillButton({
       ) : (
         <>
           <Download size={14} />
-          Download Skill
+          Preview & Download
         </>
       )}
     </button>

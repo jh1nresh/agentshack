@@ -4,7 +4,9 @@ import { useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { LogIn } from "lucide-react";
 import CheckoutCard from "@/components/CheckoutCard";
+import { CapabilityDiffPreview } from "@/components/workflow/CapabilityDiffPreview";
 import { useEscrowFund, type EscrowStep } from "@/hooks/useEscrowFund";
+import { createSkillCapabilityManifest } from "@/lib/workflow-capabilities";
 import { formatUnits } from "viem";
 
 interface Skill {
@@ -90,7 +92,7 @@ function escrowStepLabel(s: EscrowStep): string {
     case 'setting_budget': return 'Set Budget...';
     case 'funding': return 'Fund Escrow...';
     case 'confirming': return 'Confirming...';
-    default: return 'Fund & Start';
+    default: return 'Fund Safe Run';
   }
 }
 
@@ -99,6 +101,7 @@ function escrowStepLabel(s: EscrowStep): string {
 function ActivePurchasePanel({ skill }: Props) {
   const { user, getAccessToken } = usePrivy();
   const escrow = useEscrowFund();
+  const manifest = createSkillCapabilityManifest(skill);
 
   const [step, setStep] = useState<Step>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -183,7 +186,7 @@ function ActivePurchasePanel({ skill }: Props) {
   if (escrow.step === "done" && escrow.result) {
     const ar = escrow.result;
     return (
-      <div className="classified" data-label="Session Active">
+      <div className="classified" data-label="Safe Run Active">
         <div className={`text-xs font-mono ${successBg} border-l-2 px-2 py-1 mb-4`}>
           ✓ Session open · ${ar.budgetTotal} USD locked (agent-funded)
         </div>
@@ -239,7 +242,7 @@ function ActivePurchasePanel({ skill }: Props) {
     : null;
 
   return (
-    <div className="classified" data-label="Use This Skill">
+    <div className="classified" data-label="Run Once Safely">
       <div className="mb-1">
         <span className={`font-mono font-bold text-3xl ${ink}`}>
           {skill.pricePerCall ? `$${skill.pricePerCall.toFixed(2)}` : "FREE"}
@@ -247,8 +250,17 @@ function ActivePurchasePanel({ skill }: Props) {
         <span className={`font-mono text-xs ${faint} ml-1`}>/ call</span>
       </div>
       <p className={`font-mono text-[10px] ${muted} mb-4 pb-3 border-b border-dotted ${ruleLight}`}>
-        Agent-funded · BSC testnet escrow
+        Bounded session · BSC testnet escrow · no local install
       </p>
+
+      <div className="mb-4">
+        <CapabilityDiffPreview
+          manifest={manifest}
+          compact
+          title="Safe-run boundary"
+          description="This opens a bounded paid session. It does not install a local skill, command, schedule, or config change."
+        />
+      </div>
 
       {escrow.walletAddress && (
         <div className={`flex justify-between items-center mb-3 pb-2 border-b border-dotted ${ruleLight}`}>
@@ -308,7 +320,7 @@ function ActivePurchasePanel({ skill }: Props) {
         disabled={isEscrowBusy || step === "loading" || !budget || parseFloat(budget) <= 0}
         className={`w-full ${btnBg} font-mono text-xs uppercase tracking-wider py-3 transition-colors disabled:opacity-40 mb-2`}
       >
-        {isEscrowBusy ? escrowStepLabel(escrow.step) : "Fund & Start"}
+        {isEscrowBusy ? escrowStepLabel(escrow.step) : "Fund Safe Run"}
       </button>
 
       {escrow.walletAddress && (
@@ -327,7 +339,7 @@ function ActivePurchasePanel({ skill }: Props) {
       )}
 
       <div className={`text-[10px] font-mono ${fainter} border-l-2 ${ruleLight} pl-2 mt-2`}>
-        One-time USDC approval when needed · session expires in 24h
+        One-time USDC approval when needed · session expires in 24h · no silent skill install
       </div>
     </div>
   );
@@ -343,6 +355,7 @@ export default function PurchaseCard({ skill }: Props) {
 
   const isPassive = skill.skillType === "passive";
   const isFree = skill.price === 0;
+  const manifest = createSkillCapabilityManifest(skill);
 
   async function handlePassiveBuy() {
     setStep("loading");
@@ -391,9 +404,9 @@ export default function PurchaseCard({ skill }: Props) {
   // ── Not authenticated ─────────────────────────────────────────────────────
   if (!authenticated) {
     return (
-      <div className="classified" data-label={isPassive ? "Acquire" : "Use This Skill"}>
+      <div className="classified" data-label={isPassive ? "Preview Install" : "Run Once Safely"}>
         <p className={`font-serif text-sm ${muted} mb-4`}>
-          Connect your wallet to {isPassive ? "download" : "use"} this skill.
+          Connect your wallet to {isPassive ? "preview and download" : "run"} this workflow safely.
         </p>
         <button
           onClick={login}
@@ -409,9 +422,9 @@ export default function PurchaseCard({ skill }: Props) {
   // ── Passive: done ─────────────────────────────────────────────────────────
   if (step === "done" && isPassive && passiveResult) {
     return (
-      <div className="classified" data-label="Downloaded">
+      <div className="classified" data-label="Install File Ready">
         <div className={`text-xs font-mono ${successBg} border-l-2 px-2 py-1 mb-4`}>
-          ✓ Content delivered
+          ✓ File delivered · install is still manual
         </div>
         <button
           onClick={() => {
@@ -440,15 +453,19 @@ export default function PurchaseCard({ skill }: Props) {
   // ── Passive: form ─────────────────────────────────────────────────────────
   if (isPassive) {
     return (
-      <div className="classified" data-label="Acquire">
+      <div className="classified" data-label="Preview Install">
         <div className="mb-3">
           <span className={`font-mono font-bold text-3xl ${ink}`}>
             {isFree ? "Free" : `$${skill.price.toFixed(2)}`}
           </span>
         </div>
         <p className={`font-mono text-[10px] ${muted} mb-4 pb-3 border-b border-dotted ${ruleLight}`}>
-          One-time · Instant delivery · .md file
+          One-time · .md file · no automatic local changes
         </p>
+
+        <div className="mb-4">
+          <CapabilityDiffPreview manifest={manifest} compact />
+        </div>
 
         {step === "error" && error && (
           <p className="font-mono text-[10px] text-red-500 mb-3">{error}</p>
@@ -459,7 +476,7 @@ export default function PurchaseCard({ skill }: Props) {
           disabled={step === "loading"}
           className={`w-full ${btnBg} font-mono text-xs uppercase tracking-wider py-3 transition-colors disabled:opacity-40`}
         >
-          {step === "loading" ? "Preparing…" : "Download Free"}
+          {step === "loading" ? "Preparing…" : "Approve & Download File"}
         </button>
       </div>
     );

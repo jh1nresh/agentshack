@@ -17,6 +17,8 @@ import { BackgroundEffect } from "@/components/landing/BackgroundEffect";
 import { Footer } from "@/components/landing/Footer";
 import { Navbar } from "@/components/landing/Navbar";
 import { DojoPetAvatar } from "@/components/DojoPetAvatar";
+import { CapabilityDiffPreview } from "@/components/workflow/CapabilityDiffPreview";
+import { CapabilityManifestPanel } from "@/components/workflow/CapabilityManifestPanel";
 import {
   agentCardLevel,
   agentFamilyDisplayCode,
@@ -24,6 +26,7 @@ import {
   agentOfferStack,
   type AgentServiceCard,
 } from "@/lib/agent-card-catalog";
+import { createAgentCapabilityManifest } from "@/lib/workflow-capabilities";
 
 function percent(value: number) {
   return `${Math.round(value * 100)}%`;
@@ -35,9 +38,9 @@ function money(value: number) {
 
 function actionCopy(mode: string | null) {
   if (mode === "setup") return "Setup session is the rung-zero path: a guided hour to connect this agent to a real business workflow.";
-  if (mode === "subscribe") return "Subscribe keeps this agent available for recurring merchant work.";
-  if (mode === "license") return "Fork / license turns this service into your own merchant-specific version.";
-  return "Run one case, get the result, and feed a cleared receipt back into this agent card.";
+  if (mode === "subscribe") return "Subscribe keeps this agent available after schedule and permission approval.";
+  if (mode === "license") return "Fork / license turns this service into your own merchant-specific version after capability approval.";
+  return "Run one bounded case, get the result, and feed a cleared receipt back into this agent card.";
 }
 
 export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
@@ -46,6 +49,7 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
   const level = agentCardLevel(agent);
   const signatureMove = agent.abilities[0] ?? agent.workflowDeck[0] ?? "Cleared work";
   const offerStack = agentOfferStack(agent);
+  const capabilityManifest = createAgentCapabilityManifest(agent);
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] transition-colors duration-700">
@@ -92,7 +96,8 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
               <h1>{agent.name}</h1>
               <p>{agent.summary}</p>
               <div className="dojo-agent-profile-loop">
-                <span>Run once</span>
+                <span>Run safely</span>
+                <span>Inspect</span>
                 <span>Subscribe</span>
                 <span>Fork</span>
               </div>
@@ -140,7 +145,7 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
             <div>
               <div className="dojo-agent-section-title">
                 <Play className="h-3.5 w-3.5 fill-current" />
-                Hire this agent
+                Hire this agent safely
               </div>
               <p>{actionCopy(mode)}</p>
             </div>
@@ -172,6 +177,27 @@ export function CatalogAgentPageClient({ agent }: { agent: AgentServiceCard }) {
                 );
               })}
             </div>
+          </section>
+
+          <section id="permissions">
+            <CapabilityManifestPanel
+              manifest={capabilityManifest}
+              title="Safe-run permissions"
+            />
+          </section>
+
+          <section id="install-preview" className="dojo-agent-profile-panel">
+            <div>
+              <div className="dojo-agent-section-title">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Install after approval
+              </div>
+              <p>
+                Installing this card, exposing a slash command, or scheduling recurring work
+                should create an install receipt after the buyer approves the capability diff.
+              </p>
+            </div>
+            <CapabilityDiffPreview manifest={capabilityManifest} />
           </section>
 
           <div className="dojo-agent-profile-grid">

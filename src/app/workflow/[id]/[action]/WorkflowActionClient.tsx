@@ -192,10 +192,10 @@ function actionCopy(action: WorkflowAction) {
     case "run":
       return {
         icon: Play,
-        label: "Train skill",
+        label: "Run once safely",
         eyebrow: "Cleared asset",
-        title: "Train this skill and feed its reputation.",
-        body: "Dojo executes the workflow, evaluates delivery, writes a receipt, and anchors the cleared run on BSC testnet.",
+        title: "Run this workflow without installing it.",
+        body: "AgentShack executes one bounded run, evaluates delivery, writes a receipt, and anchors the cleared work on BSC testnet.",
       };
     case "fork":
       return {
@@ -368,13 +368,13 @@ function RunPanel({ workflow }: { workflow: WorkflowActionData }) {
       <div className="space-y-6">
         <section className="dojo-card p-5">
           <div className="mb-5 flex items-center justify-between">
-            <span className="label-sm">Train input</span>
+            <span className="label-sm">Safe-run input</span>
             <span className="font-mono text-[11px] text-[var(--text-muted)]">
               {workflow.version?.slaMs ?? 1200}ms SLA
             </span>
           </div>
           <p className="mb-5 rounded-[8px] border border-[var(--border-light)] bg-[var(--bg-secondary)] p-3 text-[13px] leading-relaxed text-[var(--text-secondary)]">
-            Provide {inputSummary}. Dojo runs the skill, evaluates delivery, and returns a result with a receipt.
+            Provide {inputSummary}. AgentShack runs the workflow once, evaluates delivery, and returns a result with a receipt.
           </p>
           <div className="space-y-4">
             {fields.length > 0 ? (
@@ -408,7 +408,7 @@ function RunPanel({ workflow }: { workflow: WorkflowActionData }) {
                 disabled={paidPending || missingRequired || !apiKey.trim()}
                 className="dojo-action dojo-action-primary w-full disabled:opacity-40"
               >
-                {paidPending ? "Clearing..." : `Train this skill · $${workflow.pricePerRun.toFixed(3)}`}
+                {paidPending ? "Clearing..." : `Run once safely · $${workflow.pricePerRun.toFixed(3)}`}
               </button>
               <details className="rounded-[8px] border border-[var(--border-light)] bg-[var(--bg-secondary)] p-3">
                 <summary className="cursor-pointer font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">

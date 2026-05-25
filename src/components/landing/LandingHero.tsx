@@ -188,8 +188,8 @@ function HeroStage({ selected }: { selected: AgentServiceCard }) {
       </div>
 
       <div className="dojo-shack-action-strip">
-        <Link href={selected.runHref}>Run</Link>
-        <Link href={selected.subscribeHref}>Subscribe</Link>
+        <Link href={selected.runHref}>Run safely</Link>
+        <Link href={selected.detailHref}>Inspect</Link>
         <Link href={selected.forkHref}>Fork</Link>
       </div>
     </div>
@@ -249,15 +249,27 @@ export function LandingHero(_props: LandingHeroProps) {
     <section className="dojo-marketplace dojo-agent-marketplace">
       <div className="dojo-agent-hero">
         <div className="dojo-agent-hero-copy">
-          <span className="dojo-agent-eyebrow">AgentShack agent market</span>
-          <h1>Hire agents with proof of work.</h1>
+          <span className="dojo-agent-eyebrow">AgentShack permissioned agent market</span>
+          <h1>Run agents without losing control.</h1>
           <p>
-            Open a card, see what the agent does, then run it once, subscribe,
-            or fork it into your own version with its receipt history attached.
+            Inspect what an agent can read, write, call, and install before you run it.
+            Every safe run creates a receipt; local install stays optional and explicit.
           </p>
+          <div className="mt-5 grid max-w-2xl gap-2 text-[12px] text-[var(--text-secondary)] sm:grid-cols-3">
+            {[
+              ['1', 'Inspect manifest'],
+              ['2', 'Run once safely'],
+              ['3', 'Install only after approval'],
+            ].map(([step, label]) => (
+              <div key={step} className="rounded-[8px] border border-[var(--border-light)] bg-[var(--card-bg)] px-3 py-2 font-mono">
+                <span className="mr-2 text-[var(--text-muted)]">{step}</span>
+                {label}
+              </div>
+            ))}
+          </div>
           <div className="dojo-agent-hero-actions">
-            <a href="#agents" className="dojo-action dojo-action-primary">Browse agents</a>
-            <Link href={selected.detailHref} className="dojo-action">Open {selected.name}</Link>
+            <Link href={selected.runHref} className="dojo-action dojo-action-primary">Run once safely</Link>
+            <Link href={selected.detailHref} className="dojo-action">Inspect {selected.name}</Link>
           </div>
         </div>
         <HeroStage selected={selected} />
