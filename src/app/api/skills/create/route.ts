@@ -9,6 +9,54 @@ import { buildWorkflowSpiritProfile } from "@/lib/workflow-spirit";
 
 export const dynamic = "force-dynamic";
 
+type SecurityScanInput = {
+  provider?: unknown;
+  score?: unknown;
+  severity?: unknown;
+  recommendation?: unknown;
+  findingCount?: unknown;
+  scannedAt?: unknown;
+};
+
+function normalizeSecurityScan(input: unknown) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return null;
+  }
+
+  const scan = input as SecurityScanInput;
+  const score = typeof scan.score === 'number' ? scan.score : null;
+  const findingCount = typeof scan.findingCount === 'number' ? scan.findingCount : null;
+  const scannedAt =
+    typeof scan.scannedAt === 'string'
+      ? new Date(scan.scannedAt)
+      : null;
+
+  if (score === null || score < 0 || score > 100) {
+    return null;
+  }
+
+  return {
+    securityScanProvider: typeof scan.provider === 'string'
+      ? scan.provider.slice(0, 64)
+      : 'skillspector',
+    securityRiskScore: score,
+    securityRiskSeverity: typeof scan.severity === 'string'
+      ? scan.severity.slice(0, 32)
+      : null,
+    securityRecommendation: typeof scan.recommendation === 'string'
+      ? scan.recommendation.slice(0, 64)
+      : null,
+    securityFindingCount:
+      findingCount !== null && findingCount >= 0
+        ? Math.floor(findingCount)
+        : null,
+    securityScannedAt:
+      scannedAt && !Number.isNaN(scannedAt.getTime())
+        ? scannedAt
+        : new Date(),
+  };
+}
+
 /**
  * POST /api/skills/create
  * Create a new skill + upsert user from Privy
@@ -61,6 +109,7 @@ export async function POST(req: NextRequest) {
       outputSchema,
       exampleInput,
       exampleOutput,
+      securityScan,
     } = body;
 
     // Auth — verify caller owns the privyId they're creating skills under
@@ -269,6 +318,7 @@ export async function POST(req: NextRequest) {
     const effectiveOutputShape = outputShape ?? 'json';
     const effectiveSandboxable = sandboxable ?? true;
     const effectiveAuthRequired = authRequired ?? false;
+    const normalizedSecurityScan = normalizeSecurityScan(securityScan);
 
     if (effectiveSkillType === 'active') {
       const [existingSkill, existingWorkflow] = await Promise.all([
@@ -325,6 +375,7 @@ export async function POST(req: NextRequest) {
           fileContent: fileContent ?? null,
           fileType: fileType ?? null,
           isGated: parsedPrice > 0,
+          ...normalizedSecurityScan,
           creatorId: user.id,
           skillType: effectiveSkillType,
           gatewaySlug: finalSlug,

@@ -71,6 +71,12 @@ model Skill {
   isGated     Boolean  @default(true)  // require purchase to access content
   evaluationScore  Float?    // micro evaluator score (0-100)
   evaluationPassed Boolean?  // whether skill passed evaluation
+  securityScanProvider String?
+  securityRiskScore    Float?
+  securityRiskSeverity String?
+  securityRecommendation String?
+  securityFindingCount Int?
+  securityScannedAt    DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

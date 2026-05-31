@@ -8,8 +8,10 @@
  *   DOJO_API_KEY=dojo_sk_... dojo publish --file dojo.workflow.yaml
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { basename, resolve } from 'path';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { basename, join, resolve } from 'path';
+import { spawnSync } from 'child_process';
 import matter from 'gray-matter';
 
 const yaml = require('js-yaml') as {
@@ -142,6 +144,23 @@ type LoadedManifest = {
   manifest: WorkflowManifest;
   raw: string;
   fileType: 'markdown' | 'text';
+};
+
+type SkillspectorReport = {
+  risk_score?: number;
+  risk_severity?: string;
+  risk_recommendation?: string;
+  filtered_findings?: unknown[];
+  findings?: unknown[];
+  error?: string;
+};
+
+type SkillspectorSummary = {
+  available: boolean;
+  score: number | null;
+  severity: string | null;
+  recommendation: string | null;
+  findingCount: number | null;
 };
 
 const TEMPLATE = `name: Agent Repo Analyst
@@ -364,6 +383,122 @@ function isLocalBaseUrl(baseUrl: string): boolean {
   }
 }
 
+function readRiskValue(report: SkillspectorReport, snakeName: keyof SkillspectorReport): unknown {
+  const camelName = snakeName
+    .split('_')
+    .map((part, index) => (index === 0 ? part : part[0]?.toUpperCase() + part.slice(1)))
+    .join('');
+  const record = report as Record<string, unknown>;
+  return record[snakeName] ?? record[camelName];
+}
+
+function summarizeSkillspectorReport(report: SkillspectorReport): SkillspectorSummary {
+  const scoreValue = readRiskValue(report, 'risk_score');
+  const findingsValue = report.filtered_findings ?? report.findings;
+
+  return {
+    available: true,
+    score: typeof scoreValue === 'number' ? scoreValue : null,
+    severity: typeof readRiskValue(report, 'risk_severity') === 'string'
+      ? readRiskValue(report, 'risk_severity') as string
+      : null,
+    recommendation: typeof readRiskValue(report, 'risk_recommendation') === 'string'
+      ? readRiskValue(report, 'risk_recommendation') as string
+      : null,
+    findingCount: Array.isArray(findingsValue) ? findingsValue.length : null,
+  };
+}
+
+function printScanSummary(summary: SkillspectorSummary): void {
+  if (!summary.available) {
+    console.warn('Skillspector scan skipped: skillspector binary not found.');
+    return;
+  }
+
+  console.log('Skillspector scan complete.');
+  if (summary.score !== null) console.log(`  riskScore: ${summary.score}`);
+  if (summary.severity) console.log(`  severity: ${summary.severity}`);
+  if (summary.recommendation) console.log(`  recommendation: ${summary.recommendation}`);
+  if (summary.findingCount !== null) console.log(`  findings: ${summary.findingCount}`);
+}
+
+function runSkillspectorScan(
+  file: string,
+  flags: Flags,
+  options: { required: boolean },
+): SkillspectorSummary {
+  const bin = flagString(flags, 'skillspector-bin') ?? process.env.SKILLSPECTOR_BIN ?? 'skillspector';
+  const maxRisk = Number(flagString(flags, 'max-risk', '50'));
+  if (!Number.isFinite(maxRisk) || maxRisk < 0 || maxRisk > 100) {
+    fail('Invalid --max-risk value. Use a number between 0 and 100.');
+  }
+
+  const tempDir = mkdtempSync(join(tmpdir(), 'dojo-skillspector-'));
+  const reportPath = join(tempDir, 'skillspector-report.json');
+  const args = [
+    'scan',
+    file,
+    '--format',
+    'json',
+    '--output',
+    reportPath,
+    ...(flagBool(flags, 'llm') ? [] : ['--no-llm']),
+  ];
+
+  try {
+    const result = spawnSync(bin, args, {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    if (result.error) {
+      const code = (result.error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT' && !options.required) {
+        return {
+          available: false,
+          score: null,
+          severity: null,
+          recommendation: null,
+          findingCount: null,
+        };
+      }
+      fail(`Skillspector scan could not start: ${result.error.message}`);
+    }
+
+    if (!existsSync(reportPath)) {
+      const stderr = result.stderr?.trim();
+      fail(`Skillspector did not write a JSON report.${stderr ? `\n${stderr}` : ''}`);
+    }
+
+    const report = JSON.parse(readFileSync(reportPath, 'utf8')) as SkillspectorReport;
+    if (report.error) {
+      fail(`Skillspector scan failed: ${report.error}`);
+    }
+
+    const summary = summarizeSkillspectorReport(report);
+    printScanSummary(summary);
+
+    if (summary.score !== null && summary.score > maxRisk) {
+      fail(
+        `Skillspector risk score ${summary.score} exceeds --max-risk ${maxRisk}. ` +
+        'Review the report or use --skip-scan only for trusted local testing.',
+      );
+    }
+    if (summary.recommendation === 'DO_NOT_INSTALL') {
+      fail('Skillspector recommendation is DO_NOT_INSTALL.');
+    }
+
+    return summary;
+  } catch (err) {
+    if (err instanceof SyntaxError) {
+      fail(`Could not parse Skillspector JSON report: ${err.message}`);
+    }
+    throw err;
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 async function devKey(baseUrl: string, flags: Flags) {
   if (process.env.NODE_ENV === 'production') {
     fail('dev-key is disabled when NODE_ENV=production.');
@@ -494,6 +629,7 @@ async function publish(
   apiKey: string | undefined,
   manifest: ReturnType<typeof normalizeManifest>,
   source: LoadedManifest,
+  securityScan?: SkillspectorSummary,
 ) {
   if (!apiKey) {
     console.warn('No DOJO_API_KEY provided. This only works against a local server with DOJO_SKIP_PRIVY_AUTH=true.');
@@ -529,6 +665,18 @@ async function publish(
         estLatencyMs: manifest.slaMs,
         sandboxable: true,
         authRequired: Boolean(manifest.authHeader),
+        ...(securityScan?.available
+          ? {
+              securityScan: {
+                provider: 'skillspector',
+                score: securityScan.score,
+                severity: securityScan.severity,
+                recommendation: securityScan.recommendation,
+                findingCount: securityScan.findingCount,
+                scannedAt: new Date().toISOString(),
+              },
+            }
+          : {}),
       }),
     },
   );
@@ -723,8 +871,9 @@ function printHelp() {
 Usage:
   dojo init [--file dojo.workflow.yaml]
   dojo dev-key [--fund 10]
+  dojo scan [--file dojo.workflow.yaml] [--llm] [--max-risk 50]
   DOJO_API_KEY=dojo_sk_... dojo test [--file dojo.workflow.yaml] [--url http://localhost:3000]
-  DOJO_API_KEY=dojo_sk_... dojo publish [--file dojo.workflow.yaml] [--url http://localhost:3000]
+  DOJO_API_KEY=dojo_sk_... dojo publish [--file dojo.workflow.yaml] [--url http://localhost:3000] [--skip-scan]
   DOJO_API_KEY=dojo_sk_... dojo publish --file SKILL.md
   DOJO_API_KEY=dojo_sk_... dojo fork --workflow <id-or-slug> [--name "My Fork"]
   DOJO_API_KEY=dojo_sk_... dojo deploy --workflow <id-or-slug> --endpoint https://... --price 0.25
@@ -736,11 +885,14 @@ Environment:
   DOJO_API_KEY                 Creator API key for production publish
   DOJO_BASE_URL                Dojo instance URL
   DOJO_ENDPOINT_AUTH_HEADER    Optional Authorization header sent to your endpoint during dry-run
+  SKILLSPECTOR_BIN             Optional path to the NVIDIA SkillSpector binary
 
 Notes:
   - dev-key is a local demo helper. It creates/reuses one DB-backed API key and tops up demo credits.
   - Production endpoints must be public HTTPS.
   - publish runs dry-run first unless --skip-test is passed.
+  - publish runs NVIDIA SkillSpector first unless --skip-scan is passed. Use --require-scan to fail if the binary is missing.
+  - scan uses static analysis by default. Pass --llm to enable SkillSpector semantic analysis.
   - dojo.workflow.yaml is canonical; SKILL.md frontmatter is supported for compatibility.
   - fork creates a draft workflow; deploy attaches your executable endpoint.
   - run calls /api/v1/run and prints the shareable /r/<receiptId> proof URL.
@@ -782,13 +934,30 @@ async function main() {
     return;
   }
 
+  if (command === 'scan') {
+    readManifest(file);
+    runSkillspectorScan(file, flags, { required: true });
+    return;
+  }
+
   if (command === 'publish') {
     const source = readManifest(file);
     const manifest = normalizeManifest(source.manifest);
+    let securityScan: SkillspectorSummary | undefined;
+    if (!flagBool(flags, 'skip-scan')) {
+      const summary = runSkillspectorScan(file, flags, {
+        required: flagBool(flags, 'require-scan'),
+      });
+      if (!summary.available) {
+        console.warn('Install NVIDIA SkillSpector or set SKILLSPECTOR_BIN to enable publish-time security scans.');
+      } else {
+        securityScan = summary;
+      }
+    }
     if (!flagBool(flags, 'skip-test')) {
       await dryRun(baseUrl, apiKey, manifest);
     }
-    await publish(baseUrl, apiKey, manifest, source);
+    await publish(baseUrl, apiKey, manifest, source, securityScan);
     return;
   }
 

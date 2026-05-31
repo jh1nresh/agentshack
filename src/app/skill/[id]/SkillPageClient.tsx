@@ -43,6 +43,12 @@ interface SkillData {
   gatewaySlug: string | null;
   fileContent: string | null;
   evaluationScore: number | null;
+  securityScanProvider?: string | null;
+  securityRiskScore?: number | null;
+  securityRiskSeverity?: string | null;
+  securityRecommendation?: string | null;
+  securityFindingCount?: number | null;
+  securityScannedAt?: string | null;
   executionKind?: string | null;
   inputShape?: string | null;
   outputShape?: string | null;
@@ -246,6 +252,17 @@ export default function SkillPageClient({
           receipt: 'Paid runs also create a workflow receipt.',
         };
   const capabilityManifest = createSkillCapabilityManifest(skill);
+  const hasSecurityScan = typeof skill.securityRiskScore === 'number';
+  const securityTone =
+    !hasSecurityScan
+      ? 'Not scanned'
+      : skill.securityRecommendation === 'DO_NOT_INSTALL'
+        ? 'Blocked'
+        : (skill.securityRiskScore ?? 100) <= 30
+          ? 'Low risk'
+          : (skill.securityRiskScore ?? 100) <= 50
+            ? 'Review'
+            : 'High risk';
 
   useEffect(() => {
     if (!authenticated || !user) return;
@@ -332,6 +349,26 @@ export default function SkillPageClient({
                   </div>
                   <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
                     {shortList(resultSummary)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-[var(--border-light)] bg-[var(--bg-secondary)] p-3">
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 text-[12px] font-semibold text-[var(--text)]">
+                      <ShieldCheck className="h-4 w-4" />
+                      Security scan
+                    </div>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      {securityTone}
+                    </span>
+                  </div>
+                  <p className="text-[12px] leading-relaxed text-[var(--text-secondary)]">
+                    {hasSecurityScan
+                      ? `Skillspector risk ${skill.securityRiskScore}/100${
+                          skill.securityFindingCount !== null && skill.securityFindingCount !== undefined
+                            ? ` · ${skill.securityFindingCount} findings`
+                            : ''
+                        }${skill.securityRecommendation ? ` · ${skill.securityRecommendation}` : ''}`
+                      : 'No publish-time Skillspector report has been attached yet.'}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 border-t border-[var(--border-light)] pt-4 sm:grid-cols-4">
