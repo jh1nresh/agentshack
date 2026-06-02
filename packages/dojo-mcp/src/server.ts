@@ -27,20 +27,27 @@ type ToolResult = {
   isError?: boolean;
 };
 
-type SkillListResponse = {
-  skills?: unknown;
+type ServiceListResponse = {
+  services?: unknown;
   count?: number;
-  demo?: boolean;
+  router?: unknown;
   error?: string;
 };
 
 type RunResponse = {
   result?: unknown;
+  service?: unknown;
+  mode?: string;
   cost?: number;
   balance?: number;
   score?: number;
   session_id?: string;
   latency_ms?: number;
+  receipt?: {
+    id?: string;
+    settlement_status?: string;
+    anchor_status?: string;
+  } | null;
   workflow_receipt?: {
     id?: string;
     settlement_status?: string;
@@ -111,18 +118,19 @@ async function dojoSearchWorkflows(args: Record<string, unknown>): Promise<ToolR
   const query = asString(args.query)?.trim().toLowerCase() ?? '';
   const category = asString(args.category)?.trim().toLowerCase() ?? '';
   const limit = Math.max(1, Math.min(asNumber(args.limit) ?? 10, 50));
-  const { ok, status, data } = await readJson<SkillListResponse>(`${baseUrl()}/api/v1/skills`);
+  const { ok, status, data } = await readJson<ServiceListResponse>(`${baseUrl()}/api/v1/services`);
 
   if (!ok) {
-    return errorText(`Dojo skills request failed (${status}): ${data.error ?? JSON.stringify(data)}`);
+    return errorText(`AgentShack services request failed (${status}): ${data.error ?? JSON.stringify(data)}`);
   }
 
-  const rawSkills = Array.isArray(data.skills) ? data.skills : [];
-  const skills = rawSkills
+  const rawServices = Array.isArray(data.services) ? data.services : [];
+  const services = rawServices
     .filter((item): item is Record<string, unknown> => isRecord(item))
     .filter((item) => {
       const haystack = [
-        asString(item.skill),
+        asString(item.service),
+        asString(item.legacy_skill),
         asString(item.name),
         asString(item.description),
         asString(item.category),
@@ -132,38 +140,50 @@ async function dojoSearchWorkflows(args: Record<string, unknown>): Promise<ToolR
     })
     .slice(0, limit)
     .map((item) => ({
-      skill: item.skill,
+      service: item.service,
+      legacy_skill: item.legacy_skill,
       name: item.name,
       description: item.description,
-      price_per_call: item.price_per_call,
+      pricing: item.pricing,
       category: item.category,
-      maturity: item.maturity,
+      trust: item.trust,
+      security_scan: item.security_scan,
+      run_modes: item.run_modes,
       workflow: item.workflow,
       example_input: item.example_input,
     }));
 
   return jsonText({
-    count: skills.length,
+    count: services.length,
     base_url: baseUrl(),
-    workflows: skills,
+    router: data.router,
+    services,
   });
 }
 
 async function dojoRunWorkflow(args: Record<string, unknown>): Promise<ToolResult> {
-  const skill = asString(args.skill) ?? asString(args.workflow);
-  if (!skill) return errorText('Missing required argument: skill');
+  const service = asString(args.service);
+  const skill = asString(args.skill);
+  const workflow = asString(args.workflow);
+  const requested = service ?? skill ?? workflow;
+  if (!requested) return errorText('Missing required argument: service');
 
   const key = asString(args.api_key) ?? apiKey();
   if (!key) return errorText('DOJO_API_KEY is required to run workflows.');
 
   const input = asRecord(args.input);
+  const payload = service
+    ? { service, input }
+    : skill
+      ? { skill, input }
+      : { workflow: workflow!, input };
   const { ok, status, data } = await readJson<RunResponse>(`${baseUrl()}/api/v1/run`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${key}`,
     },
-    body: JSON.stringify({ skill, input }),
+    body: JSON.stringify(payload),
   });
 
   if (!ok) {
@@ -172,15 +192,19 @@ async function dojoRunWorkflow(args: Record<string, unknown>): Promise<ToolResul
   }
 
   return jsonText({
-    skill,
+    service: data.service ?? requested,
+    mode: data.mode,
     result: data.result,
     cost: data.cost,
     balance: data.balance,
     score: data.score,
     session_id: data.session_id,
     latency_ms: data.latency_ms,
+    receipt: data.receipt ?? data.workflow_receipt,
     workflow_receipt: data.workflow_receipt,
-    receipt_url: data.workflow_receipt?.id ? `${baseUrl()}/r/${data.workflow_receipt.id}` : null,
+    receipt_url: (data.receipt?.id ?? data.workflow_receipt?.id)
+      ? `${baseUrl()}/r/${data.receipt?.id ?? data.workflow_receipt?.id}`
+      : null,
   });
 }
 
@@ -204,8 +228,34 @@ async function dojoGetReceipt(args: Record<string, unknown>): Promise<ToolResult
 
 const tools = [
   {
+    name: 'agentshack_list_services',
+    description: 'List AgentShack services that can be run once and return receipts.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search text for service name, slug, or description.' },
+        category: { type: 'string', description: 'Optional exact category filter.' },
+        limit: { type: 'number', description: 'Max results, 1-50. Default 10.' },
+      },
+    },
+  },
+  {
+    name: 'agentshack_run_service',
+    description: 'Run an AgentShack service once through the clearing API and return the receipt URL.',
+    inputSchema: {
+      type: 'object',
+      required: ['service'],
+      properties: {
+        service: { type: 'string', description: 'AgentShack service slug.' },
+        workflow: { type: 'string', description: 'Legacy workflow slug.' },
+        input: { type: 'object', description: 'Service input JSON object.' },
+        api_key: { type: 'string', description: 'Optional AgentShack API key override. Defaults to DOJO_API_KEY.' },
+      },
+    },
+  },
+  {
     name: 'dojo_search_workflows',
-    description: 'Search public Dojo workflows available for cleared execution.',
+    description: 'Legacy alias: search public AgentShack services available for cleared execution.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -217,12 +267,13 @@ const tools = [
   },
   {
     name: 'dojo_run_workflow',
-    description: 'Run a Dojo workflow through the clearing API and return the execution receipt URL.',
+    description: 'Legacy alias: run an AgentShack service through the clearing API and return the execution receipt URL.',
     inputSchema: {
       type: 'object',
-      required: ['skill'],
       properties: {
-        skill: { type: 'string', description: 'Dojo gateway slug, e.g. jiagon-negotiator.' },
+        service: { type: 'string', description: 'AgentShack service slug.' },
+        skill: { type: 'string', description: 'Legacy Dojo gateway slug.' },
+        workflow: { type: 'string', description: 'Legacy workflow slug.' },
         input: { type: 'object', description: 'Workflow input JSON object.' },
         api_key: { type: 'string', description: 'Optional Dojo API key override. Defaults to DOJO_API_KEY.' },
       },
@@ -247,6 +298,8 @@ async function callTool(params: unknown): Promise<ToolResult> {
   const args = asRecord(parsed.arguments);
 
   try {
+    if (name === 'agentshack_list_services') return await dojoSearchWorkflows(args);
+    if (name === 'agentshack_run_service') return await dojoRunWorkflow(args);
     if (name === 'dojo_search_workflows') return await dojoSearchWorkflows(args);
     if (name === 'dojo_run_workflow') return await dojoRunWorkflow(args);
     if (name === 'dojo_get_receipt') return await dojoGetReceipt(args);

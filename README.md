@@ -46,15 +46,13 @@ Example NFA metadata:
 ```
 Agent calls workflow via REST API
         ↓
-POST /api/v1/run { skill: "jiagon-negotiator", input: { repo_url: "https://github.com/garrytan/gbrain" } }
+POST /api/v1/run { service: "jiagon-negotiator", input: { repo_url: "https://github.com/garrytan/gbrain" } }
         ↓
-Dojo routes to workflow/provider endpoint → evaluates (delivered? format? latency?)
+AgentShack routes to workflow/provider endpoint → evaluates (delivered? format? latency?)
         ↓
-Run clears → settlement proof / receipt on BSC
+Run clears → DB receipt now; BSC anchor is async best-effort when configured
         ↓
-On-chain: PASS → 95% to creator / FAIL → 100% refund to agent
-        ↓
-Execution receipt + trust score update
+Execution receipt + receipt-backed service trust stats
 ```
 
 ## REST API (v1)
@@ -62,11 +60,11 @@ Execution receipt + trust score update
 All endpoints at `/api/v1/`. Agent developers need one API key.
 
 ```bash
-# One-call lifecycle: find workflow → create session → execute → evaluate → return
+# One-call lifecycle: find service → create session → execute → evaluate → receipt
 POST /api/v1/run
   -H "Authorization: Bearer <api_key>"
-  -d '{"skill": "jiagon-negotiator", "input": {"repo_url": "https://github.com/garrytan/gbrain"}}'
-# → { "result": {...}, "cost": 0.003, "balance": 9.997, "score": 1.0 }
+  -d '{"service": "jiagon-negotiator", "input": {"repo_url": "https://github.com/garrytan/gbrain"}}'
+# → { "result": {...}, "cost": 0.003, "receipt": {"id": "..."}, "reputation_update": {...} }
 
 # Check credits
 GET /api/v1/balance
@@ -74,7 +72,17 @@ GET /api/v1/balance
 # Deposit testnet credits
 POST /api/v1/deposit  -d '{"amount": 10}'
 
-# Browse workflow catalog (public, no auth)
+# Browse service catalog (public, no auth)
+GET /api/v1/services
+# DB-backed only: no demo fallback, so empty means no published receipt-backed services.
+
+# Fetch receipt proof (public, no auth)
+GET /api/v1/receipts/:receiptId
+# Path params: receiptId = WorkflowRunReceipt id.
+curl http://localhost:3000/api/v1/receipts/cmop19dlo000g106kgfthrls2
+# → { "id": "...", "workflow": {...}, "clearing": {...}, "evaluator": {...}, "proof": {...} }
+
+# Browse legacy workflow/skill catalog (public, no auth)
 GET /api/v1/skills
 
 # Browse workflow-native catalog (public, no auth)
@@ -92,7 +100,7 @@ POST /api/v1/close  -d '{"session_id": "..."}'
 
 ## Workflows
 
-Current listed skills are one-step workflows. Workflow metadata, versions, fork lineage, run receipts, and royalties are tracked separately without breaking `/api/v1/run`.
+Current listed services are one-step workflows. A service is the external abstraction for a runnable agent / workflow / skill package. Workflow metadata, versions, fork lineage, run receipts, and royalties are tracked separately without breaking legacy `/api/v1/run { skill }`.
 
 | Workflow | Type | Price/run | Endpoint |
 |-------|------|-----------|----------|
@@ -110,7 +118,10 @@ DOJO_API_KEY=dojo_sk_... npx @maiat/dojo test --file dojo.workflow.yaml
 DOJO_API_KEY=dojo_sk_... npx @maiat/dojo publish --file dojo.workflow.yaml
 DOJO_API_KEY=dojo_sk_... npx @maiat/dojo fork --workflow jiagon-negotiator --name "My Repo Analyst"
 DOJO_API_KEY=dojo_sk_... npx @maiat/dojo deploy --workflow my-repo-analyst --file dojo.workflow.yaml
+DOJO_API_KEY=dojo_sk_... npx @maiat/dojo run --service jiagon-negotiator --input '{"repo_url":"https://github.com/garrytan/gbrain"}'
 ```
+
+`run --service` is the current form. `run --skill` remains a legacy alias for older gateway slugs.
 
 `publish` runs `/api/skills/dry-run` first, then creates the active `Skill`, `Workflow`, and first `WorkflowVersion` through `/api/skills/create`. Use `examples/dojo.workflow.yaml` as the starter manifest. Production creator endpoints must be public HTTPS URLs.
 
@@ -127,7 +138,7 @@ Inside this repo, developers can run the same CLI without publishing the npm pac
 ```bash
 npm run dojo -- help
 npm run dojo -- dev-key
-DOJO_API_KEY=dojo_sk_... npm run dojo -- run --skill jiagon-negotiator --input '{"repo_url":"https://github.com/garrytan/gbrain"}'
+DOJO_API_KEY=dojo_sk_... npm run dojo -- run --service jiagon-negotiator --input '{"repo_url":"https://github.com/garrytan/gbrain"}'
 ```
 
 `dev-key` is a local demo helper for the BNB/Codex/MCP flow. It reuses or creates
@@ -143,7 +154,7 @@ so `/api/v1/run` can write the clearing receipt.
 | Database | Prisma + SQLite (→ Postgres in prod) |
 | Chain | BSC (BNB Smart Chain) — testnet 97, mainnet 56 |
 | Contracts | ERC-8183 AgenticCommerceHooked + hooks (Solidity 0.8.24, Foundry) |
-| Settlement | Gateway-signed `closeAndSettle()` — atomic on-chain |
+| Settlement | DB receipt first; gateway-signed `closeAndSettle()` is used by the session-close / BSC rail |
 | Reputation | BAS attestations + TrustScoreOracle |
 | Wallet | viem (server-side relayer for testnet) |
 
@@ -176,7 +187,7 @@ npx tsx prisma/seed.ts     # 4 skills + 3 agents + reviews
 npm run dev                # http://localhost:3000
 
 # Verify
-curl http://localhost:3000/api/v1/skills
+curl http://localhost:3000/api/v1/services
 ```
 
 ## Architecture
@@ -184,15 +195,15 @@ curl http://localhost:3000/api/v1/skills
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                    AGENT DEVELOPERS                           │
-│              POST /api/v1/run (one HTTP call)                 │
+│          POST /api/v1/run { service } (one HTTP call)         │
 └──────────────────────┬───────────────────────────────────────┘
                        │
                        ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                     DOJO (REST API + Chat UI)                 │
 ├────────────┬─────────────┬──────────────┬────────────────────┤
-│  /v1/run   │  /v1/skills │  /v1/balance │  /v1/reputation    │
-│  (execute) │  (catalog)  │  (credits)   │  (trust score)     │
+│  /v1/run   │ /v1/services│  /v1/balance │  /v1/receipts      │
+│  (execute) │  (catalog)  │  (credits)   │  (proof)           │
 └─────┬──────┴──────┬──────┴──────┬───────┴────────┬───────────┘
       │             │             │                │
       ▼             ▼             ▼                ▼
@@ -214,12 +225,12 @@ curl http://localhost:3000/api/v1/skills
 
 ## Workflow Clearing Flow
 
-1. Agent calls `POST /api/v1/run` -> session auto-created, workflow executed, evaluated
+1. Agent calls `POST /api/v1/run` with a `service` slug -> session auto-created, workflow executed, evaluated, receipt returned
 2. Session budget exhausted (or manual `POST /api/v1/close`)
-3. Gateway signs evaluation proof (EIP-191): `keccak256(chainId, contract, jobId, score, calls, passRate)`
-4. `closeAndSettle(jobId, score, calls, passRate, signature)` on BSC
-5. Contract verifies signature → settles USDC (PASS: 95% creator / FAIL: 100% refund)
-6. AfterAction hooks fire atomically: BAS attestation + trust score update
+3. AgentShack writes a `WorkflowRunReceipt` with evaluator evidence, cost, settlement status, provenance, and lineage refs
+4. Service trust stats are derived from receipt rows
+5. If BSC anchoring is configured, the receipt is marked `pending` and tx hashes are written back asynchronously
+6. Full on-chain escrow settlement, BAS hooks, and verifier-attested clearing remain the next clearing-network upgrade
 
 ## Product Direction
 
@@ -238,7 +249,8 @@ Implemented workflow primitives:
 - `GET /api/workflows`
 - `POST /api/workflows/:id/fork`
 - Agent Repo Analyst internal endpoint
-- `/api/v1/run` writes a `WorkflowRunReceipt` when the execution target has a workflow wrapper
+- `/api/v1/services` exposes runnable service descriptors, pricing, trust stats, and security scan status
+- `/api/v1/run` writes a `WorkflowRunReceipt` for receipt-backed services
 
 ## Links
 

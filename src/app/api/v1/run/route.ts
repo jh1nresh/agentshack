@@ -5,13 +5,21 @@ import {
   anchorExecutionAsync,
   PHASE2_ADDRESSES,
   skillIdForSlug,
-  validateRegisteredWorkflowSlug,
 } from '@/lib/swap-router';
 import { prisma } from '@/lib/prisma';
 import { parseBody, v1RunInput } from '@/lib/validators';
 import { logError } from '@/lib/logger';
 import { recordWorkflowRun, type WorkflowReceiptSummary } from '@/lib/workflow-ledger';
 import { readCreatorResponseText } from '@/lib/creator-response';
+import { isLegacyWorkflowSlug } from '@/lib/legacy-workflow-slugs';
+import {
+  findServiceSkill,
+  receiptRollupsByWorkflowId,
+  serviceDescriptor,
+  serviceRouterDescriptor,
+  serviceSlugFromSkill,
+  validateRuntimeServiceEndpoint,
+} from '@/lib/service-gateway';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,12 +27,15 @@ export const dynamic = 'force-dynamic';
  * POST /api/v1/run
  *
  * Dead-simple REST wrapper for agent developers.
- * One HTTP call = find workflow/skill → find/create session → execute → evaluate → return.
+ * One HTTP call = find service → find/create session → execute → evaluate → receipt.
  *
  * Auth: Bearer API key (not Privy JWT).
  * Agent developers never see sessions, nonces, or escrow.
  *
  * Request:
+ *   { "service": "sll-r/refund-negotiator", "input": { "order_id": "ord_123" } }
+ *
+ * Legacy request:
  *   { "skill": "jiagon-negotiator", "input": { "repo_url": "https://github.com/garrytan/gbrain" } }
  *
  * Response:
@@ -49,43 +60,71 @@ export async function POST(req: NextRequest) {
   // --- Parse body ---
   const parsed = await parseBody(req, v1RunInput);
   if (!parsed.success) return parsed.response;
-  const { skill: skillSlug, input, provenance } = parsed.data;
+  const { input, provenance } = parsed.data;
+  const requestedService = (parsed.data.service ?? parsed.data.skill ?? parsed.data.workflow)!;
 
-  // --- Find skill ---
-  const skill = await prisma.skill.findUnique({
-    where: { gatewaySlug: skillSlug },
-  });
-
+  // --- Resolve external service to executable skill ---
+  const skill = await findServiceSkill(requestedService);
   if (!skill) {
     return NextResponse.json(
-      { error: `Skill "${skillSlug}" not found` },
+      {
+        error: `Service "${requestedService}" not found`,
+        router: serviceRouterDescriptor(requestedService, null),
+      },
       { status: 404 },
     );
   }
 
-  if (skill.skillType !== 'active' || !skill.endpointUrl) {
+  const matchedService = serviceSlugFromSkill(skill);
+  const skillSlug = skill.gatewaySlug;
+  const endpointUrl = skill.endpointUrl;
+  if (!skillSlug) {
     return NextResponse.json(
-      { error: `Skill "${skillSlug}" is not an active (pay-per-use) skill` },
-      { status: 400 },
+      {
+        error: `Service "${requestedService}" is missing a gateway slug`,
+        router: serviceRouterDescriptor(requestedService, matchedService),
+      },
+      { status: 409 },
+    );
+  }
+
+  if (!endpointUrl) {
+    return NextResponse.json(
+      {
+        error: `Service "${requestedService}" is missing an endpoint`,
+        router: serviceRouterDescriptor(requestedService, matchedService),
+      },
+      { status: 409 },
+    );
+  }
+
+  if (!skill.workflow || isLegacyWorkflowSlug(skillSlug) || isLegacyWorkflowSlug(skill.workflow.slug)) {
+    return NextResponse.json(
+      {
+        error: `Service "${requestedService}" is not receipt-backed`,
+        code: 'SERVICE_RECEIPT_REQUIRED',
+        router: serviceRouterDescriptor(requestedService, matchedService),
+        receipt_policy: {
+          guaranteed: false,
+          required: true,
+          reason: 'AgentShack services must have a published workflow wrapper before paid run-once execution.',
+        },
+      },
+      { status: 409 },
     );
   }
 
   const pricePerCall = skill.pricePerCall ?? 0;
   const onchainSkillId = skill.gatewaySlug ? skillIdForSlug(skill.gatewaySlug) : null;
-
-  const registry = await validateRegisteredWorkflowSlug(skillSlug);
-  if (!registry.ok) {
+  const endpointError = await validateRuntimeServiceEndpoint(endpointUrl);
+  if (endpointError) {
     return NextResponse.json(
       {
-        error: registry.error,
-        code: registry.code,
-        skill: skillSlug,
-        skill_id: registry.skillId,
-        registry: registry.registry,
-        active: registry.active,
-        reason: registry.reason,
+        error: endpointError,
+        code: 'SERVICE_ENDPOINT_BLOCKED',
+        router: serviceRouterDescriptor(requestedService, matchedService),
       },
-      { status: registry.status },
+      { status: 409 },
     );
   }
 
@@ -96,6 +135,12 @@ export async function POST(req: NextRequest) {
         error: 'Insufficient credits',
         balance: user.creditBalance,
         required: pricePerCall,
+        service: matchedService,
+        authorization: {
+          type: 'api_key',
+          balance_required_usdc: pricePerCall,
+          balance_available_usdc: user.creditBalance,
+        },
       },
       { status: 402 },
     );
@@ -173,10 +218,26 @@ export async function POST(req: NextRequest) {
         .digest('hex');
     }
 
-    const res = await fetch(skill.endpointUrl, {
+    // Re-resolve immediately before fetch to narrow DNS rebinding TOCTOU.
+    // Residual gap: fetch performs its own lookup; a pinned-IP dispatcher would
+    // eliminate that final race while keeping redirect: 'error'.
+    const fetchEndpointError = await validateRuntimeServiceEndpoint(endpointUrl);
+    if (fetchEndpointError) {
+      return NextResponse.json(
+        {
+          error: fetchEndpointError,
+          code: 'SERVICE_ENDPOINT_BLOCKED',
+          router: serviceRouterDescriptor(requestedService, matchedService),
+        },
+        { status: 409 },
+      );
+    }
+
+    const res = await fetch(endpointUrl, {
       method: 'POST',
       headers,
       body: rawBody,
+      redirect: 'error',
       signal: AbortSignal.timeout(30_000),
     });
 
@@ -203,6 +264,7 @@ export async function POST(req: NextRequest) {
   const shouldCharge = !failed && creatorStatus > 0;
   const cost = shouldCharge ? pricePerCall : 0;
   let workflowReceipt: WorkflowReceiptSummary | null = null;
+  let postTransactionBalance = user.creditBalance;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -242,6 +304,7 @@ export async function POST(req: NextRequest) {
         provenance: {
           contextRefs: [
             'api:/api/v1/run',
+            `service:${matchedService}`,
             `skill:${skillSlug}`,
             `session:${session!.id}`,
             `nonce:${nonce}`,
@@ -289,6 +352,12 @@ export async function POST(req: NextRequest) {
           throw new Error('INSUFFICIENT_BALANCE');
         }
       }
+
+      const updatedUser = await tx.user.findUnique({
+        where: { id: user.id },
+        select: { creditBalance: true },
+      });
+      postTransactionBalance = updatedUser?.creditBalance ?? postTransactionBalance;
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Transaction failed';
@@ -334,34 +403,48 @@ export async function POST(req: NextRequest) {
     // keep as string
   }
   const receiptForResponse = workflowReceipt as WorkflowReceiptSummary | null;
+  const serviceRollups = await receiptRollupsByWorkflowId([skill.workflow.id]);
+  const serviceSummary = serviceDescriptor(skill, serviceRollups.get(skill.workflow.id));
+  const router = serviceRouterDescriptor(requestedService, matchedService);
+  const buildReceiptResponse = () => (
+    receiptForResponse
+      ? {
+          id: receiptForResponse.id,
+          url: `/r/${receiptForResponse.id}`,
+          workflow_id: receiptForResponse.workflowId,
+          version_id: receiptForResponse.versionId,
+          settlement_status: receiptForResponse.settlementStatus,
+          anchor_status: receiptForResponse.anchorStatus,
+          onchain_request_id: receiptForResponse.onchainRequestId,
+          swap_tx_hash: receiptForResponse.swapTxHash,
+          settle_tx_hash: receiptForResponse.settleTxHash,
+          provenance: receiptForResponse.provenance,
+        }
+      : null
+  );
 
   // --- Response ---
   if (failed) {
+    const receiptResponse = buildReceiptResponse();
     return NextResponse.json(
       {
         error: 'Skill endpoint unreachable or timed out',
         reason: failureReason || undefined,
+        service: serviceSummary,
+        router,
         cost: 0,
-        balance: user.creditBalance,
+        balance: postTransactionBalance,
         session_id: session.id,
-        ...(receiptForResponse ? {
-          workflow_receipt: {
-            id: receiptForResponse.id,
-            workflow_id: receiptForResponse.workflowId,
-            version_id: receiptForResponse.versionId,
-            settlement_status: receiptForResponse.settlementStatus,
-            anchor_status: receiptForResponse.anchorStatus,
-            provenance: receiptForResponse.provenance,
-          },
-        } : {}),
+        receipt: receiptResponse,
+        workflow_receipt: receiptResponse,
       },
       { status: 502 },
     );
   }
 
   // --- Phase 2 on-chain anchor (fire-and-forget) ---
-  // Anchor successful executions to BSC via SwapRouter. Registration is checked
-  // before execution; tx hashes are written back to the receipt asynchronously.
+  // Anchor successful executions to BSC via SwapRouter best-effort. The DB receipt
+  // is the Phase 1 proof; tx hashes are written back asynchronously when available.
   let onchainPromise: Promise<void> | null = null;
   if (shouldCharge && onchainSkillId) {
     if (receiptForResponse) {
@@ -424,26 +507,28 @@ export async function POST(req: NextRequest) {
         logError('v1/run:anchor', err, { skill: skillSlug });
       });
   }
+  const receiptResponse = buildReceiptResponse();
 
   return NextResponse.json({
     result,
+    service: serviceSummary,
+    router,
+    mode: 'run_once',
     cost,
-    balance: user.creditBalance - cost,
+    balance: postTransactionBalance,
     score: evalResult.score,
     session_id: session.id,
-    ...(receiptForResponse ? {
-      workflow_receipt: {
-        id: receiptForResponse.id,
-        workflow_id: receiptForResponse.workflowId,
-        version_id: receiptForResponse.versionId,
-        settlement_status: receiptForResponse.settlementStatus,
-        anchor_status: receiptForResponse.anchorStatus,
-        onchain_request_id: receiptForResponse.onchainRequestId,
-        swap_tx_hash: receiptForResponse.swapTxHash,
-        settle_tx_hash: receiptForResponse.settleTxHash,
-        provenance: receiptForResponse.provenance,
-      },
-    } : {}),
+    receipt: receiptResponse,
+    workflow_receipt: receiptResponse,
+    reputation_update: receiptForResponse
+      ? {
+          service: matchedService,
+          receipt_id: receiptForResponse.id,
+          workflow_id: receiptForResponse.workflowId,
+          score: evalResult.score,
+          settlement_status: receiptForResponse.settlementStatus,
+        }
+      : null,
     latency_ms: latencyMs,
     ...(settleTriggered && { settle_triggered: true }),
     ...(onchainPromise && {

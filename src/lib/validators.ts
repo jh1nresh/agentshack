@@ -33,9 +33,19 @@ const v1RunProvenanceInput = z.object({
 });
 
 export const v1RunInput = z.object({
-  skill: z.string().min(1, 'skill (gatewaySlug) is required'),
+  service: z.string().min(1, 'service is required').optional(),
+  skill: z.string().min(1, 'skill (gatewaySlug) is required').optional(),
+  workflow: z.string().min(1, 'workflow is required').optional(),
   input: z.record(z.unknown()).optional(),
   provenance: v1RunProvenanceInput.optional(),
+}).superRefine((value, ctx) => {
+  if (!value.service && !value.skill && !value.workflow) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'service or skill is required',
+      path: ['service'],
+    });
+  }
 });
 
 export const v1DepositInput = z.object({
@@ -81,6 +91,7 @@ export async function parseBody<T>(
         if (e.code === 'invalid_type' && e.received === 'undefined') {
           return `${field}: required`;
         }
+        if (e.code === z.ZodIssueCode.custom) return `${field}: ${e.message}`;
         if (e.code === 'too_small') return `${field}: too short or too small`;
         if (e.code === 'too_big') return `${field}: too large`;
         return `${field}: invalid`;

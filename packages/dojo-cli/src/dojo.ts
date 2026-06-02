@@ -108,13 +108,25 @@ type DeployResponse = {
 
 type RunResponse = {
   result?: unknown;
+  service?: {
+    service?: string | null;
+    name?: string;
+  };
+  mode?: string;
   cost?: number;
   balance?: number;
   score?: number;
   session_id?: string;
   latency_ms?: number;
+  receipt?: {
+    id?: string;
+    url?: string;
+    settlement_status?: string;
+    anchor_status?: string;
+  } | null;
   workflow_receipt?: {
     id?: string;
+    url?: string;
     workflow_id?: string;
     version_id?: string | null;
     settlement_status?: string;
@@ -586,7 +598,7 @@ async function devKey(baseUrl: string, flags: Flags) {
     console.log('\nExport:');
     console.log(`  export DOJO_API_KEY=${apiKey}`);
     console.log('\nDemo run:');
-    console.log(`  DOJO_API_KEY=${apiKey} npm run dojo -- run --skill jiagon-negotiator --input '{"repo_url":"https://github.com/garrytan/gbrain","question":"Is this useful for building persistent-memory agents?"}'`);
+    console.log(`  DOJO_API_KEY=${apiKey} npm run dojo -- run --service jiagon-negotiator --input '{"repo_url":"https://github.com/garrytan/gbrain","question":"Is this useful for building persistent-memory agents?"}'`);
   } finally {
     await prisma.$disconnect();
   }
@@ -818,10 +830,18 @@ async function runWorkflow(
 ) {
   if (!apiKey) fail('DOJO_API_KEY or --api-key is required for run.');
 
-  const skill = flagString(flags, 'skill') ?? flagString(flags, 'workflow');
-  if (!skill) fail('Missing --skill <gateway-slug>.');
+  const service = flagString(flags, 'service');
+  const skill = flagString(flags, 'skill');
+  const workflow = flagString(flags, 'workflow');
+  const requested = service ?? skill ?? workflow;
+  if (!requested) fail('Missing --service <service-slug>.');
 
   const input = readJsonInput(flags);
+  const payload = service
+    ? { service, input }
+    : skill
+      ? { skill, input }
+      : { workflow: workflow!, input };
   const { ok, status, data } = await requestJson<RunResponse>(
     `${baseUrl}/api/v1/run`,
     {
@@ -830,7 +850,7 @@ async function runWorkflow(
         'Content-Type': 'application/json',
         ...authHeaders(apiKey),
       },
-      body: JSON.stringify({ skill, input }),
+      body: JSON.stringify(payload),
     },
   );
 
@@ -839,22 +859,26 @@ async function runWorkflow(
     fail(`Run failed (HTTP ${status}): ${data.error ?? JSON.stringify(data)}${reason}`);
   }
 
-  console.log('Workflow run cleared.');
-  console.log(`  skill: ${skill}`);
+  console.log('AgentShack service run cleared.');
+  console.log(`  service: ${data.service?.service ?? requested}`);
+  if (data.service?.name) console.log(`  name: ${data.service.name}`);
+  if (data.mode) console.log(`  mode: ${data.mode}`);
   if (typeof data.cost === 'number') console.log(`  cost: ${data.cost}`);
   if (typeof data.balance === 'number') console.log(`  balance: ${data.balance}`);
   if (typeof data.score === 'number') console.log(`  score: ${data.score}`);
   if (data.session_id) console.log(`  sessionId: ${data.session_id}`);
   if (typeof data.latency_ms === 'number') console.log(`  latency: ${data.latency_ms}ms`);
-  if (data.workflow_receipt?.id) {
-    console.log(`  receiptId: ${data.workflow_receipt.id}`);
-    console.log(`  receiptUrl: ${baseUrl}/r/${data.workflow_receipt.id}`);
+  const receipt = data.receipt ?? data.workflow_receipt ?? null;
+  if (receipt?.id) {
+    const receiptUrl = receipt.url ?? `/r/${receipt.id}`;
+    console.log(`  receiptId: ${receipt.id}`);
+    console.log(`  receiptUrl: ${/^https?:\/\//i.test(receiptUrl) ? receiptUrl : `${baseUrl}${receiptUrl}`}`);
   }
-  if (data.workflow_receipt?.settlement_status) {
-    console.log(`  settlement: ${data.workflow_receipt.settlement_status}`);
+  if (receipt?.settlement_status) {
+    console.log(`  settlement: ${receipt.settlement_status}`);
   }
-  if (data.workflow_receipt?.anchor_status) {
-    console.log(`  anchor: ${data.workflow_receipt.anchor_status}`);
+  if (receipt?.anchor_status) {
+    console.log(`  anchor: ${receipt.anchor_status}`);
   }
 
   if (!flagBool(flags, 'no-result')) {
@@ -878,8 +902,8 @@ Usage:
   DOJO_API_KEY=dojo_sk_... dojo fork --workflow <id-or-slug> [--name "My Fork"]
   DOJO_API_KEY=dojo_sk_... dojo deploy --workflow <id-or-slug> --endpoint https://... --price 0.25
   DOJO_API_KEY=dojo_sk_... dojo deploy --workflow <id-or-slug> --file dojo.workflow.yaml
-  DOJO_API_KEY=dojo_sk_... dojo run --skill <gateway-slug> --input '{"target":"..."}'
-  DOJO_API_KEY=dojo_sk_... dojo run --skill <gateway-slug> --input-file input.json
+  DOJO_API_KEY=dojo_sk_... dojo run --service <service-slug> --input '{"target":"..."}'
+  DOJO_API_KEY=dojo_sk_... dojo run --service <service-slug> --input-file input.json
 
 Environment:
   DOJO_API_KEY                 Creator API key for production publish
@@ -895,7 +919,7 @@ Notes:
   - scan uses static analysis by default. Pass --llm to enable SkillSpector semantic analysis.
   - dojo.workflow.yaml is canonical; SKILL.md frontmatter is supported for compatibility.
   - fork creates a draft workflow; deploy attaches your executable endpoint.
-  - run calls /api/v1/run and prints the shareable /r/<receiptId> proof URL.
+  - run calls /api/v1/run with a service slug and prints the shareable /r/<receiptId> proof URL.
 `);
 }
 

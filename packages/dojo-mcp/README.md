@@ -1,12 +1,17 @@
 # @maiat/dojo-mcp
 
-Minimal stdio MCP server for Dojo clearing demos.
+Minimal stdio MCP server for AgentShack clearing demos.
 
 ## Tools
 
-- `dojo_search_workflows` — list public workflows from `/api/v1/skills`
-- `dojo_run_workflow` — run a workflow through `/api/v1/run`
+- `agentshack_list_services` — list public services from `/api/v1/services`
+- `agentshack_run_service` — run one service through `/api/v1/run`
 - `dojo_get_receipt` — inspect a receipt through `/api/v1/receipts/:id`
+
+Legacy aliases are still available:
+
+- `dojo_search_workflows`
+- `dojo_run_workflow`
 
 ## Local usage
 
