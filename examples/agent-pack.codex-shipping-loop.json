@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "agentshack.agent-pack.v0",
+  "agentId": "codex-shipping-loop-agent",
+  "name": "Codex Shipping Loop Agent",
+  "providerId": "jhinresh-workflows",
+  "job": "Turn a scoped engineering task into a verified patch or PR with receipt.",
+  "activationCriteria": [
+    "User provides repo, task brief, acceptance criteria, and verification path.",
+    "User asks for code changes, review fixes, or PR-ready implementation evidence."
+  ],
+  "nonActivationCriteria": [
+    "Task is vague product strategy without code scope.",
+    "Task touches auth, payment, security, deployment, or permissions without explicit PM gate.",
+    "User asks to merge, deploy, publish, or send externally without action-time approval."
+  ],
+  "inputSchema": {
+    "type": "object",
+    "required": ["repo", "taskBrief", "acceptanceCriteria"],
+    "properties": {
+      "repo": { "type": "string" },
+      "taskBrief": { "type": "string" },
+      "acceptanceCriteria": { "type": "array", "items": { "type": "string" } },
+      "verificationCommands": { "type": "array", "items": { "type": "string" } }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": ["resultType", "summary", "verification"],
+    "properties": {
+      "resultType": {
+        "type": "string",
+        "enum": ["patch_with_verification", "pr_with_verification", "blocked_report"]
+      },
+      "summary": { "type": "string" },
+      "verification": { "type": "array", "items": { "type": "string" } },
+      "pullRequestUrl": { "type": "string" }
+    }
+  },
+  "requiredTools": [
+    {
+      "tool": "git",
+      "purpose": "Inspect branch state, diffs, and commit history for scoped code changes.",
+      "required": true,
+      "riskLevel": "medium",
+      "userApprovalRequired": false
+    },
+    {
+      "tool": "terminal",
+      "purpose": "Run repository tests, builds, typechecks, and diff checks.",
+      "required": true,
+      "riskLevel": "medium",
+      "userApprovalRequired": false
+    },
+    {
+      "tool": "github_pr",
+      "purpose": "Open a pull request after local verification when explicitly approved.",
+      "required": false,
+      "riskLevel": "high",
+      "userApprovalRequired": true
+    }
+  ],
+  "writeScopes": [
+    "target_repo_worktree",
+    "github_pull_request_optional",
+    "agentshack.workflow_runs",
+    "agentshack.workflow_receipts"
+  ],
+  "externalSideEffects": [
+    "optional GitHub PR creation"
+  ],
+  "contextBundleRefs": [],
+  "evaluatorPolicyId": "maiat-code-task-evaluator-v0",
+  "receiptSchemaId": "code-task-receipt-v0",
+  "settlementPolicyId": "fixed-task-escrow-or-manual-refund-v0",
+  "pricing": {
+    "mode": "quote_required"
+  },
+  "refundRules": [
+    {
+      "trigger": "technical git, test, build, or tool failure",
+      "outcome": "manual_review",
+      "notes": "Manual review if local tooling prevents completion but useful evidence was collected."
+    },
+    {
+      "trigger": "missing verification evidence",
+      "outcome": "partial",
+      "notes": "Partial charge only if a useful patch exists but required verification could not run."
+    }
+  ],
+  "exampleRuns": [],
+  "privacyPolicy": {
+    "defaultReceiptVisibility": "public_sanitized",
+    "rawEvidenceStoredBy": "provider_app",
+    "publicFieldsAllowed": ["repo", "resultType", "summary", "verification", "pullRequestUrl"],
+    "privateFieldsNeverPublished": ["privateRepoToken", "privateEnv", "credentials", "unredactedLogs", "secrets"],
+    "onchainDefault": "batch_hash_only"
+  },
+  "version": "0.1.0",
+  "status": "review"
+}

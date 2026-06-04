@@ -11,6 +11,24 @@ const toolPermissionSchema = z.object({
   userApprovalRequired: z.boolean(),
 });
 
+const toolPermissionsSchema = z.array(toolPermissionSchema).superRefine((tools, ctx) => {
+  const seen = new Map<string, number>();
+
+  tools.forEach((permission, index) => {
+    const firstIndex = seen.get(permission.tool);
+    if (firstIndex !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [index, "tool"],
+        message: `duplicate required tool "${permission.tool}" also appears at requiredTools.${firstIndex}.tool`,
+      });
+      return;
+    }
+
+    seen.set(permission.tool, index);
+  });
+});
+
 const pricingPolicySchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("free") }),
   z.object({
@@ -56,7 +74,7 @@ export const agentPackManifestSchema = z.object({
   nonActivationCriteria: z.array(z.string().min(1)).min(1),
   inputSchema: jsonObjectSchema,
   outputSchema: jsonObjectSchema,
-  requiredTools: z.array(toolPermissionSchema),
+  requiredTools: toolPermissionsSchema,
   writeScopes: z.array(z.string().min(1)),
   externalSideEffects: z.array(z.string().min(1)),
   contextBundleRefs: z.array(z.string().min(1)),
@@ -87,6 +105,18 @@ export const agentPackManifestSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["exampleRuns"],
       message: "listed agent packs require at least one example run",
+    });
+  }
+
+  const privateFields = new Set(manifest.privacyPolicy.privateFieldsNeverPublished);
+  const publicPrivateOverlap = manifest.privacyPolicy.publicFieldsAllowed.filter((field) =>
+    privateFields.has(field),
+  );
+  if (publicPrivateOverlap.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["privacyPolicy", "publicFieldsAllowed"],
+      message: `public fields include private-only fields: ${publicPrivateOverlap.join(", ")}`,
     });
   }
 });
@@ -122,9 +152,26 @@ export type AgentPackValidationResult =
       errors: string[];
     };
 
+function canonicalize(value: unknown): unknown {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => canonicalize(item));
+  }
+
+  const record = value as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.keys(record)
+      .sort()
+      .map((key) => [key, canonicalize(record[key])]),
+  );
+}
+
 export function hashAgentPackManifest(manifest: AgentPackManifest): string {
   return createHash("sha256")
-    .update(JSON.stringify(manifest))
+    .update(JSON.stringify(canonicalize(manifest)))
     .digest("hex");
 }
 

@@ -4,6 +4,48 @@ import { validateAgentPackManifest } from "@/lib/agent-pack-manifest";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const MAX_BODY_BYTES = 128 * 1024;
+
+async function readBoundedJson(req: NextRequest): Promise<
+  | { ok: true; body: unknown }
+  | { ok: false; status: 400 | 413; error: string }
+> {
+  const contentLength = req.headers.get("content-length");
+  if (contentLength) {
+    const byteLength = Number(contentLength);
+    if (Number.isFinite(byteLength) && byteLength > MAX_BODY_BYTES) {
+      return { ok: false, status: 413, error: "Request body too large" };
+    }
+  }
+
+  if (!req.body) {
+    return { ok: false, status: 400, error: "Invalid JSON body" };
+  }
+
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let receivedBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    receivedBytes += value.byteLength;
+    if (receivedBytes > MAX_BODY_BYTES) {
+      return { ok: false, status: 413, error: "Request body too large" };
+    }
+    chunks.push(value);
+  }
+
+  try {
+    const bodyText = new TextDecoder().decode(
+      chunks.length === 1 ? chunks[0] : Buffer.concat(chunks),
+    );
+    return { ok: true, body: JSON.parse(bodyText) };
+  } catch {
+    return { ok: false, status: 400, error: "Invalid JSON body" };
+  }
+}
+
 /**
  * POST /api/agent-packs/validate
  *
@@ -11,14 +53,12 @@ export const runtime = "nodejs";
  * execute, bill, or store anything.
  */
 export async function POST(req: NextRequest) {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  const parsed = await readBoundedJson(req);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
 
-  const result = validateAgentPackManifest(body);
+  const result = validateAgentPackManifest(parsed.body);
   if (!result.valid) {
     return NextResponse.json(
       {
