@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "agentshack.agent-pack.v0",
+  "agentId": "save-place-recovery-agent",
+  "name": "SAV-E Place Recovery Agent",
+  "providerId": "save",
+  "job": "Turn messy food/travel social sources into evidence-backed SAV-E Cards.",
+  "activationCriteria": [
+    "User submits Instagram Reel, X post, screenshot, pasted caption, or map/social place clue.",
+    "Source appears related to food, travel, local places, activities, trips, or venue intent."
+  ],
+  "nonActivationCriteria": [
+    "Source is unrelated to place memory.",
+    "Source requires private account scraping not authorized by the user.",
+    "User asks for generic chat, not place recovery."
+  ],
+  "inputSchema": {
+    "type": "object",
+    "required": ["source"],
+    "properties": {
+      "source": { "type": "string" },
+      "note": { "type": "string" }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": ["resultType", "sanitizedEvidenceSummary"],
+    "properties": {
+      "resultType": {
+        "type": "string",
+        "enum": ["confirmed_map_stamp", "review_candidate", "source_only_clue", "technical_failure"]
+      },
+      "sanitizedEvidenceSummary": { "type": "string" }
+    }
+  },
+  "requiredTools": [
+    {
+      "tool": "python_worker",
+      "purpose": "Normalize source text and metadata into a candidate record.",
+      "required": true,
+      "riskLevel": "low",
+      "userApprovalRequired": false
+    },
+    {
+      "tool": "ocr_optional",
+      "purpose": "Extract text from user-provided screenshots.",
+      "required": false,
+      "riskLevel": "medium",
+      "userApprovalRequired": true
+    },
+    {
+      "tool": "places_search_optional",
+      "purpose": "Resolve a user-approved place clue to candidate map matches.",
+      "required": false,
+      "riskLevel": "medium",
+      "userApprovalRequired": true
+    },
+    {
+      "tool": "llm_classifier",
+      "purpose": "Classify whether a source is a place-memory candidate.",
+      "required": true,
+      "riskLevel": "low",
+      "userApprovalRequired": false
+    }
+  ],
+  "writeScopes": [
+    "save.workflow_runs",
+    "save.workflow_receipts",
+    "save.place_candidates"
+  ],
+  "externalSideEffects": [],
+  "contextBundleRefs": [],
+  "evaluatorPolicyId": "maiat-save-place-recovery-v0",
+  "receiptSchemaId": "save-place-recovery-receipt-v0",
+  "settlementPolicyId": "save-credit-settlement-v0",
+  "pricing": {
+    "mode": "credits",
+    "creditsPerRun": 1,
+    "packageHint": "$9 / 10 credits"
+  },
+  "refundRules": [
+    {
+      "trigger": "technical fetch/tool failure",
+      "outcome": "refund",
+      "notes": "Refund if required source processing fails before a candidate can be produced."
+    },
+    {
+      "trigger": "hallucinated or wrong confirmed Map Stamp",
+      "outcome": "refund",
+      "notes": "Refund if evaluator finds that the confirmed map stamp was unsupported by evidence."
+    },
+    {
+      "trigger": "source-only due to insufficient evidence",
+      "outcome": "partial",
+      "notes": "Partial charge when source is preserved but not enough evidence exists for a map stamp."
+    }
+  ],
+  "exampleRuns": [],
+  "privacyPolicy": {
+    "defaultReceiptVisibility": "private",
+    "rawEvidenceStoredBy": "provider_app",
+    "publicFieldsAllowed": ["sourceType", "resultType", "verdict", "sanitizedEvidenceSummary"],
+    "privateFieldsNeverPublished": ["rawSourceUrl", "screenshot", "rawOCR", "userPrivateNote", "exactSavedLocationHistory"],
+    "onchainDefault": "batch_hash_only"
+  },
+  "version": "0.1.0",
+  "status": "review"
+}

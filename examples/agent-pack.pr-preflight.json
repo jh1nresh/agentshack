@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "agentshack.agent-pack.v0",
+  "agentId": "pr-preflight-agent",
+  "name": "PR Preflight Agent",
+  "providerId": "agentshack",
+  "job": "Review a GitHub pull request for scope, tests, security blockers, and merge readiness.",
+  "activationCriteria": [
+    "User provides a public or authorized GitHub pull request URL.",
+    "User asks for merge readiness, scoped review, or preflight evidence."
+  ],
+  "nonActivationCriteria": [
+    "User asks the agent to merge without explicit approval.",
+    "Repository access or CI evidence is unavailable.",
+    "The task requires credentials or production deployment."
+  ],
+  "inputSchema": {
+    "type": "object",
+    "required": ["pullRequestUrl"],
+    "properties": {
+      "pullRequestUrl": { "type": "string" },
+      "riskMode": { "type": "string", "enum": ["quick", "standard"] }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": ["verdict", "summary", "evidenceRefs"],
+    "properties": {
+      "verdict": { "type": "string", "enum": ["pass", "fail", "partial"] },
+      "summary": { "type": "string" },
+      "evidenceRefs": { "type": "array", "items": { "type": "string" } }
+    }
+  },
+  "requiredTools": [
+    {
+      "tool": "github_read",
+      "purpose": "Read PR diff, commits, comments, and check status.",
+      "required": true,
+      "riskLevel": "medium",
+      "userApprovalRequired": true
+    },
+    {
+      "tool": "shell_readonly",
+      "purpose": "Run local read-only git and test status checks when repo is available.",
+      "required": false,
+      "riskLevel": "medium",
+      "userApprovalRequired": true
+    },
+    {
+      "tool": "coderabbit_review",
+      "purpose": "Collect structured AI review findings when configured.",
+      "required": false,
+      "riskLevel": "low",
+      "userApprovalRequired": false
+    }
+  ],
+  "writeScopes": [
+    "agentshack.workflow_runs",
+    "agentshack.workflow_receipts"
+  ],
+  "externalSideEffects": [],
+  "contextBundleRefs": [],
+  "evaluatorPolicyId": "maiat-pr-preflight-v0",
+  "receiptSchemaId": "runtime-agnostic-work-receipt-v0",
+  "settlementPolicyId": "demo-cleared-pay-on-pass-v0",
+  "pricing": {
+    "mode": "fixed",
+    "amount": 10,
+    "currency": "USD"
+  },
+  "refundRules": [
+    {
+      "trigger": "technical GitHub, CI, or tool failure",
+      "outcome": "refund",
+      "notes": "Refund when the agent cannot collect required evidence due to tool or access failure."
+    },
+    {
+      "trigger": "missing evidence refs",
+      "outcome": "manual_review",
+      "notes": "Manual review if the summary is useful but evidence refs are incomplete."
+    }
+  ],
+  "exampleRuns": [],
+  "privacyPolicy": {
+    "defaultReceiptVisibility": "public_sanitized",
+    "rawEvidenceStoredBy": "agentshack",
+    "publicFieldsAllowed": ["pullRequestUrl", "verdict", "summary", "evidenceRefs"],
+    "privateFieldsNeverPublished": ["privateRepoToken", "privateEnv", "credentials", "unredactedLogs"],
+    "onchainDefault": "batch_hash_only"
+  },
+  "version": "0.1.0",
+  "status": "review"
+}
