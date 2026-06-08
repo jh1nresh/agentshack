@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import "forge-std/Test.sol";
 import "../src/SkillNFT.sol";
 import "./mocks/MockUSDC.sol";
+import {Mock18DecimalsUSDC} from "./mocks/Mock18DecimalsUSDC.sol";
 
 contract SkillNFTTest is Test {
     SkillNFT public nft;
@@ -38,6 +39,12 @@ contract SkillNFTTest is Test {
         assertEq(s.royaltyBps, 1500);
         assertEq(s.totalSold, 0);
         assertTrue(s.active);
+    }
+
+    function test_constructor_revertsOnNonSixDecimalUSDC() public {
+        Mock18DecimalsUSDC wrongUsdc = new Mock18DecimalsUSDC();
+        vm.expectRevert(abi.encodeWithSelector(SkillNFT.InvalidUSDCDecimals.selector, 18, 6));
+        new SkillNFT(address(wrongUsdc), platform, repPool);
     }
 
     function test_createSkill_incrementsId() public {
@@ -96,6 +103,17 @@ contract SkillNFTTest is Test {
 
         // totalSold
         assertEq(nft.getSkill(1).totalSold, 1);
+    }
+
+    function test_buySkill_feeDustPolicyGoesToCreator() public {
+        nft.createSkill(10_019, creator, 1500, "uri");
+
+        vm.prank(buyer);
+        nft.buySkill(1, buyer);
+
+        assertEq(usdc.balanceOf(platform), 1_001);
+        assertEq(usdc.balanceOf(repPool), 500);
+        assertEq(usdc.balanceOf(creator), 8_518);
     }
 
     function test_buySkill_multipleBuys() public {

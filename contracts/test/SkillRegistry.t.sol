@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import {SkillRegistry}  from "../src/SkillRegistry.sol";
 import {SkillRunToken}  from "../src/SkillRunToken.sol";
 import {MockUSDC}       from "./mocks/MockUSDC.sol";
+import {Mock18DecimalsUSDC} from "./mocks/Mock18DecimalsUSDC.sol";
 
 contract SkillRegistryTest is Test {
     SkillRegistry public registry;
@@ -78,6 +79,12 @@ contract SkillRegistryTest is Test {
         vm.prank(provider);
         vm.expectRevert(SkillRegistry.RouterNotSet.selector);
         fresh.register(SLUG, PRICE, creator, METADATA_URI, GATEWAY_SLUG, CATEGORY_SKILL, 0);
+    }
+
+    function test_constructor_revertsOnNonSixDecimalUSDC() public {
+        Mock18DecimalsUSDC wrongUsdc = new Mock18DecimalsUSDC();
+        vm.expectRevert(abi.encodeWithSelector(SkillRegistry.InvalidUSDCDecimals.selector, 18, 6));
+        new SkillRegistry(wrongUsdc);
     }
 
     function test_register_revertsOnEmptySlug() public {
