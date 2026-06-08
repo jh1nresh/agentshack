@@ -8,6 +8,7 @@ import {SwapRouter}     from "../src/SwapRouter.sol";
 import {ReputationHub}  from "../src/ReputationHub.sol";
 import {IReputationHub} from "../src/interfaces/IReputationHub.sol";
 import {MockUSDC}       from "./mocks/MockUSDC.sol";
+import {Mock18DecimalsUSDC} from "./mocks/Mock18DecimalsUSDC.sol";
 import {MockTrustOracle} from "./mocks/MockTrustOracle.sol";
 
 contract SwapRouterTest is Test {
@@ -232,6 +233,20 @@ contract SwapRouterTest is Test {
         assertEq(uint8(_reqStatus(reqId)), uint8(SwapRouter.RequestStatus.Settled));
     }
 
+    function test_settle_startedRequestDistributesFees() public {
+        vm.prank(agent);
+        bytes32 reqId = router.swap(skillId, type(uint256).max, "");
+
+        vm.prank(gateway);
+        router.markStarted(reqId);
+
+        vm.prank(gateway);
+        router.settle(reqId, true, bytes32("result"));
+
+        assertEq(uint8(_reqStatus(reqId)), uint8(SwapRouter.RequestStatus.Settled));
+        assertEq(router.totalEscrowed(), 0);
+    }
+
     function test_settle_failureRefunds() public {
         uint256 balBefore = usdc.balanceOf(agent);
         vm.prank(agent);
@@ -241,6 +256,22 @@ contract SwapRouterTest is Test {
         router.settle(reqId, false, bytes32(0));
 
         assertEq(usdc.balanceOf(agent), balBefore); // full refund
+        assertEq(router.totalEscrowed(), 0);
+        assertEq(uint8(_reqStatus(reqId)), uint8(SwapRouter.RequestStatus.Refunded));
+    }
+
+    function test_settle_startedRequestCanRefundOnFailure() public {
+        uint256 balBefore = usdc.balanceOf(agent);
+        vm.prank(agent);
+        bytes32 reqId = router.swap(skillId, type(uint256).max, "");
+
+        vm.prank(gateway);
+        router.markStarted(reqId);
+
+        vm.prank(gateway);
+        router.settle(reqId, false, bytes32(0));
+
+        assertEq(usdc.balanceOf(agent), balBefore);
         assertEq(router.totalEscrowed(), 0);
         assertEq(uint8(_reqStatus(reqId)), uint8(SwapRouter.RequestStatus.Refunded));
     }
@@ -309,6 +340,36 @@ contract SwapRouterTest is Test {
         router.claimRefund(reqId);
     }
 
+    function test_markStarted_blocksClaimRefundAfterTTL() public {
+        vm.prank(agent);
+        bytes32 reqId = router.swap(skillId, type(uint256).max, "");
+
+        vm.prank(gateway);
+        router.markStarted(reqId);
+
+        vm.warp(block.timestamp + router.REQUEST_TTL() + 1);
+        vm.prank(agent);
+        vm.expectRevert(abi.encodeWithSelector(SwapRouter.RequestNotPending.selector, reqId));
+        router.claimRefund(reqId);
+    }
+
+    function test_markStarted_revertsFromNonGateway() public {
+        vm.prank(agent);
+        bytes32 reqId = router.swap(skillId, type(uint256).max, "");
+
+        vm.prank(otherAgent);
+        vm.expectRevert(SwapRouter.NotGateway.selector);
+        router.markStarted(reqId);
+    }
+
+    function test_markStarted_revertsOnUnknownRequest() public {
+        vm.prank(gateway);
+        vm.expectRevert(abi.encodeWithSelector(
+            SwapRouter.RequestNotFound.selector, bytes32("unknown")
+        ));
+        router.markStarted(bytes32("unknown"));
+    }
+
     // ── admin ─────────────────────────────────────────────────
 
     function test_setGateway_byOwner() public {
@@ -332,6 +393,32 @@ contract SwapRouterTest is Test {
     function test_setFees_revertsOnInvalidBps() public {
         vm.expectRevert(SwapRouter.InvalidBps.selector);
         router.setFees(6_000, 5_000); // sums to >=10000
+    }
+
+    function test_constructor_revertsOnNonSixDecimalUSDC() public {
+        Mock18DecimalsUSDC wrongUsdc = new Mock18DecimalsUSDC();
+        vm.expectRevert(abi.encodeWithSelector(SwapRouter.InvalidUSDCDecimals.selector, 18, 6));
+        new SwapRouter(registry, hub, wrongUsdc, gateway, platform, repPool);
+    }
+
+    function test_settle_feeDustPolicyGoesToCreator() public {
+        bytes32 dustSkillId;
+        address dustRunToken;
+        vm.prank(provider);
+        (dustSkillId, dustRunToken) = registry.register(
+            "dust-skill", 1_019, creator, "ipfs://dust", bytes32("dust.v1"), 0, 0
+        );
+        dustRunToken;
+
+        vm.prank(agent);
+        bytes32 reqId = router.swap(dustSkillId, type(uint256).max, "");
+
+        vm.prank(gateway);
+        router.settle(reqId, true, bytes32("result"));
+
+        assertEq(usdc.balanceOf(platform), 50);
+        assertEq(usdc.balanceOf(repPool), 50);
+        assertEq(usdc.balanceOf(creator), 919);
     }
 
     function test_rescueTokens_revertsWhenUsdcBacksOpenRequest() public {

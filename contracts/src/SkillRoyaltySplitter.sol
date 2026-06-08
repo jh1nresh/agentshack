@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -49,6 +50,7 @@ contract SkillRoyaltySplitter is Ownable, ReentrancyGuard {
     /// @notice Minimum payment amount: 0.01 USDC (10000 units at 6 decimals)
     /// @dev Prevents zero-rounding where operator/creator get 0 on tiny amounts
     uint256 public constant MIN_AMOUNT = 10000;
+    uint8 public constant REQUIRED_USDC_DECIMALS = 6;
 
     // ── Events ─────────────────────────────────────────────
     event ServicePayment(
@@ -77,6 +79,7 @@ contract SkillRoyaltySplitter is Ownable, ReentrancyGuard {
     error OperatorBpsTooLow();
     error TransferFailed(address recipient);
     error InsufficientSurplus(uint256 requested, uint256 available);
+    error InvalidUSDCDecimals(uint8 actual, uint8 expected);
     error NothingToWithdraw();
 
     // ── Constructor ────────────────────────────────────────
@@ -88,6 +91,8 @@ contract SkillRoyaltySplitter is Ownable, ReentrancyGuard {
         if (_usdc == address(0) || _skillNft == address(0) || _platformWallet == address(0)) {
             revert InvalidAddress();
         }
+        uint8 decimals = IERC20Metadata(_usdc).decimals();
+        if (decimals != REQUIRED_USDC_DECIMALS) revert InvalidUSDCDecimals(decimals, REQUIRED_USDC_DECIMALS);
         usdc = IERC20(_usdc);
         skillNft = ISkillNFT(_skillNft);
         skillNftERC1155 = IERC1155(_skillNft);
@@ -128,6 +133,7 @@ contract SkillRoyaltySplitter is Ownable, ReentrancyGuard {
 
         uint256 operatorAmt = (amount * operatorBps) / 10000;
         uint256 creatorAmt  = (amount * creatorBps) / 10000;
+        // Fee dust policy: operator/creator round down and platform receives the remainder.
         uint256 platformAmt = amount - operatorAmt - creatorAmt;
 
         // F3: Pull full amount to contract, then credit via withdrawal pattern.

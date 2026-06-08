@@ -102,49 +102,64 @@ Files:
 - `contracts/src/SkillRoyaltySplitter.sol`
 - `contracts/test/SkillRoyaltySplitter.t.sol`
 
+### 4. SwapRouter timeout refund could race delayed off-chain delivery
+
+`claimRefund` was purely time-based. If the gateway performed work but did not settle within `REQUEST_TTL`, the agent could refund and the later successful settlement would revert.
+
+Fix:
+
+- Added `RequestStatus.Started`.
+- Added gateway-only `markStarted(requestId)`.
+- `claimRefund` remains available only while a request is `Pending`.
+- `settle` accepts both `Pending` and `Started` requests, so the gateway can still settle after it marks execution as started.
+- Tests cover started success settlement, started failure refund, non-gateway calls, unknown requests, and timeout refund blocking after start.
+
+Files:
+
+- `contracts/src/SwapRouter.sol`
+- `contracts/test/SwapRouter.t.sol`
+
+### 5. Payment token decimals were implicit
+
+The commerce contracts assumed 6-decimal USDC accounting but only deployment conventions enforced that assumption.
+
+Fix:
+
+- `SkillRegistry`, `SwapRouter`, `SkillNFT`, and `SkillRoyaltySplitter` now reject payment tokens whose `IERC20Metadata.decimals()` is not 6.
+- Tests cover non-6-decimal constructor rejection.
+- Canonical token address remains a deployment/preflight policy rather than an on-chain allowlist.
+
+Files:
+
+- `contracts/src/SkillRegistry.sol`
+- `contracts/src/SwapRouter.sol`
+- `contracts/src/SkillNFT.sol`
+- `contracts/src/SkillRoyaltySplitter.sol`
+- `contracts/test/mocks/Mock18DecimalsUSDC.sol`
+
+### 6. Fee rounding dust policy was implicit
+
+Fee division rounds down by default. The previous code did not state who receives the remainder.
+
+Fix:
+
+- Documented the protocol policy in code:
+  - `SwapRouter` and `SkillNFT`: platform/reputation round down and creator receives the remainder.
+  - `SkillRoyaltySplitter`: operator/creator round down and platform receives the remainder.
+- Tests cover the dust recipient in each path.
+
+Files:
+
+- `contracts/src/SwapRouter.sol`
+- `contracts/src/SkillNFT.sol`
+- `contracts/src/SkillRoyaltySplitter.sol`
+- `contracts/test/SwapRouter.t.sol`
+- `contracts/test/SkillNFT.t.sol`
+- `contracts/test/SkillRoyaltySplitter.t.sol`
+
 ## Remaining Findings / Leads
 
-### A. SwapRouter timeout refund can race delayed off-chain settlement
-
-`claimRefund` is purely time-based. If the gateway performs or exposes work but does not settle within `REQUEST_TTL`, the agent can refund and the later successful settlement reverts.
-
-Status:
-
-- Not fixed in this patch because a correct fix changes the gateway lifecycle protocol.
-
-Recommended next fix:
-
-- Add an execution lifecycle state such as `Started`, set by gateway before delivery, or require gateway-signed refund authorization after TTL.
-- Alternatively, settle on-chain before exposing the artifact to the requester.
-
-### B. Payment token assumptions depend on canonical USDC
-
-`SkillRegistry`, `SwapRouter`, `SkillNFT`, and `SkillRoyaltySplitter` assume standard non-deflationary USDC semantics. A fee-on-transfer or rebasing token would break nominal-amount accounting.
-
-Status:
-
-- Deployment scripts default to BSC testnet USDC and tests use 6-decimal mocks.
-- No generic token support should be claimed.
-
-Recommended next fix:
-
-- Enforce canonical USDC addresses per chain or require `IERC20Metadata.decimals() == 6` where that is the intended unit.
-- Add deployment preflight checks for token decimals and canonical addresses.
-
-### C. Fee rounding dust goes to creator
-
-For low prices that are not divisible cleanly by basis points, platform and reputation shares round down and the remainder goes to creator.
-
-Status:
-
-- Low impact at current USDC base-unit scale.
-- Treat as protocol policy unless the product wants every dust unit to favor the platform/reputation pool.
-
-Recommended next fix:
-
-- Explicitly document dust-to-creator policy or switch fee calculations to protocol-favoring rounding.
-
-### D. Transferable ERC1155 ownership is the operator authorization primitive
+### A. Transferable ERC1155 ownership is the operator authorization primitive
 
 `SkillRoyaltySplitter.pay` authorizes an operator by checking `balanceOf(operator, skillId) > 0`. Since skill NFTs are transferable, this is a transferable license model, not a provider-bound operator registry.
 
@@ -174,7 +189,6 @@ Remaining Slither output:
 ## Verification
 
 - `forge build` passed.
-- `forge test -vv` passed: 160 tests.
+- `forge test -vv` passed: 172 tests.
 - `git diff --check` passed.
 - Slither rerun completed with only low-signal warnings listed above.
-

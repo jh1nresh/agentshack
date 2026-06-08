@@ -5,6 +5,7 @@ import "forge-std/Test.sol";
 import "../src/SkillNFT.sol";
 import "../src/SkillRoyaltySplitter.sol";
 import "./mocks/MockUSDC.sol";
+import {Mock18DecimalsUSDC} from "./mocks/Mock18DecimalsUSDC.sol";
 
 contract SkillRoyaltySplitterTest is Test {
     SkillNFT public nft;
@@ -64,6 +65,21 @@ contract SkillRoyaltySplitterTest is Test {
         assertEq(usdc.balanceOf(operator) - operatorBefore, 0.8e6);
         assertEq(usdc.balanceOf(creator) - creatorBefore, 0.15e6);
         assertEq(usdc.balanceOf(platform) - platformBefore, 0.05e6);
+    }
+
+    function test_constructor_revertsOnNonSixDecimalUSDC() public {
+        Mock18DecimalsUSDC wrongUsdc = new Mock18DecimalsUSDC();
+        vm.expectRevert(abi.encodeWithSelector(SkillRoyaltySplitter.InvalidUSDCDecimals.selector, 18, 6));
+        new SkillRoyaltySplitter(address(wrongUsdc), address(nft), platform);
+    }
+
+    function test_pay_feeDustPolicyGoesToPlatform() public {
+        vm.prank(buyer);
+        splitter.pay(1, operator, 10_019);
+
+        assertEq(splitter.pendingWithdrawals(operator), 8_015);
+        assertEq(splitter.pendingWithdrawals(creator), 1_502);
+        assertEq(splitter.pendingWithdrawals(platform), 502);
     }
 
     function test_pay_largeAmount() public {

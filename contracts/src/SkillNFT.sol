@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -53,6 +54,7 @@ contract SkillNFT is ERC1155, IERC2981, Ownable, ReentrancyGuard, ISkillNFT {
 
     /// @notice Minimum skill price: 0.01 USDC (10000 units at 6 decimals)
     uint256 public constant MIN_PRICE = 10000;
+    uint8 public constant REQUIRED_USDC_DECIMALS = 6;
 
     // ─────────────────────────────────────────────
     //  State
@@ -118,6 +120,7 @@ contract SkillNFT is ERC1155, IERC2981, Ownable, ReentrancyGuard, ISkillNFT {
     error InvalidBps();
     error PriceTooLow(uint256 price, uint256 minPrice);
     error InsufficientBalance();
+    error InvalidUSDCDecimals(uint8 actual, uint8 expected);
 
     // ─────────────────────────────────────────────
     //  Constructor
@@ -136,6 +139,8 @@ contract SkillNFT is ERC1155, IERC2981, Ownable, ReentrancyGuard, ISkillNFT {
         if (_usdc == address(0) || _platformWallet == address(0) || _reputationPool == address(0)) {
             revert InvalidAddress();
         }
+        uint8 decimals = IERC20Metadata(_usdc).decimals();
+        if (decimals != REQUIRED_USDC_DECIMALS) revert InvalidUSDCDecimals(decimals, REQUIRED_USDC_DECIMALS);
         usdc = IERC20(_usdc);
         platformWallet = _platformWallet;
         reputationPool = _reputationPool;
@@ -204,6 +209,7 @@ contract SkillNFT is ERC1155, IERC2981, Ownable, ReentrancyGuard, ISkillNFT {
         // Calculate splits
         uint256 platformShare    = (price * platformFeeBps) / 10000;
         uint256 reputationShare  = (price * reputationPoolBps) / 10000;
+        // Fee dust policy: platform/reputation round down and creator receives the remainder.
         uint256 creatorShare     = price - platformShare - reputationShare;
 
         // Pull full amount from buyer first

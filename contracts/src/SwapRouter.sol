@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IERC20}         from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20}      from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable}        from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -38,7 +39,7 @@ contract SwapRouter is Ownable, ReentrancyGuard {
     //  Types
     // ─────────────────────────────────────────────
 
-    enum RequestStatus { None, Pending, Settled, Refunded }
+    enum RequestStatus { None, Pending, Started, Settled, Refunded }
 
     struct Request {
         bytes32       skillId;
@@ -61,6 +62,7 @@ contract SwapRouter is Ownable, ReentrancyGuard {
 
     uint256 public constant MAX_BPS     = 10_000;
     uint32  public constant REQUEST_TTL = 15 minutes; // agent self-refund after TTL
+    uint8   public constant REQUIRED_USDC_DECIMALS = 6;
 
     // ─────────────────────────────────────────────
     //  Immutables
@@ -121,6 +123,7 @@ contract SwapRouter is Ownable, ReentrancyGuard {
         uint256 amountUSDC,
         bytes   params
     );
+    event ExecutionStarted(bytes32 indexed requestId, bytes32 indexed skillId, address indexed agent);
     event ExecutionSettled(
         bytes32 indexed requestId,
         bytes32 indexed skillId,
@@ -152,6 +155,7 @@ contract SwapRouter is Ownable, ReentrancyGuard {
     error PriceExceedsMax(uint256 actualPrice, uint256 maxPrice);
     error InsufficientTokenBalance(uint256 have, uint256 need);
     error InsufficientSurplus(uint256 requested, uint256 available);
+    error InvalidUSDCDecimals(uint8 actual, uint8 expected);
     error NothingPending();
 
     // ─────────────────────────────────────────────
@@ -172,6 +176,8 @@ contract SwapRouter is Ownable, ReentrancyGuard {
             gateway_             == address(0) ||
             platformTreasury_    == address(0) ||
             reputationPool_      == address(0)) revert ZeroAddress();
+        uint8 decimals = IERC20Metadata(address(usdc_)).decimals();
+        if (decimals != REQUIRED_USDC_DECIMALS) revert InvalidUSDCDecimals(decimals, REQUIRED_USDC_DECIMALS);
         registry          = registry_;
         reputation        = reputation_;
         usdc              = usdc_;
@@ -291,6 +297,16 @@ contract SwapRouter is Ownable, ReentrancyGuard {
      *  {pendingWithdrawal} so the whole request doesn't revert
      *  (audit finding #4).
      */
+    function markStarted(bytes32 requestId) external nonReentrant {
+        if (msg.sender != gateway) revert NotGateway();
+        Request storage r = requests[requestId];
+        if (r.status == RequestStatus.None) revert RequestNotFound(requestId);
+        if (r.status != RequestStatus.Pending) revert RequestNotPending(requestId);
+
+        r.status = RequestStatus.Started;
+        emit ExecutionStarted(requestId, r.skillId, r.agent);
+    }
+
     function settle(
         bytes32 requestId,
         bool    success,
@@ -299,7 +315,7 @@ contract SwapRouter is Ownable, ReentrancyGuard {
         if (msg.sender != gateway) revert NotGateway();
         Request storage r = requests[requestId];
         if (r.status == RequestStatus.None) revert RequestNotFound(requestId);
-        if (r.status != RequestStatus.Pending) revert RequestNotPending(requestId);
+        if (r.status != RequestStatus.Pending && r.status != RequestStatus.Started) revert RequestNotPending(requestId);
 
         uint256 amount = r.amountUSDC;
         totalEscrowed -= amount;
@@ -308,6 +324,7 @@ contract SwapRouter is Ownable, ReentrancyGuard {
             r.status = RequestStatus.Settled;
             uint256 platformShare   = (amount * r.platformBps)   / MAX_BPS;
             uint256 reputationShare = (amount * r.reputationBps) / MAX_BPS;
+            // Fee dust policy: platform/reputation round down and creator receives the remainder.
             uint256 creatorShare    = amount - platformShare - reputationShare;
 
             _safeCredit(r.creator,          creatorShare);

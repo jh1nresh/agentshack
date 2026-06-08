@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IERC20}         from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20}      from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable}        from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -52,12 +53,13 @@ contract SkillRegistry is Ownable, ReentrancyGuard {
     // ─────────────────────────────────────────────
 
     uint256 public constant MIN_PRICE = 1_000; // 0.001 USDC
+    uint8 public constant REQUIRED_USDC_DECIMALS = 6;
 
     // ─────────────────────────────────────────────
     //  State
     // ─────────────────────────────────────────────
 
-    /// @notice Payment token (USDC, 6 decimals on BSC; 18 on mainnet — see deploy script).
+    /// @notice Payment token must report 6 decimals; canonical address is deployment policy.
     IERC20 public immutable usdc;
 
     /// @notice Authorised router — sole caller of treasury ops. Existing
@@ -113,6 +115,7 @@ contract SkillRegistry is Ownable, ReentrancyGuard {
     error InsufficientTreasury(uint256 requested, uint256 available);
     error SupplyOutstanding(bytes32 skillId, uint256 supply);
     error InvalidCategory(uint8 category);
+    error InvalidUSDCDecimals(uint8 actual, uint8 expected);
 
     // ─────────────────────────────────────────────
     //  Modifiers
@@ -129,6 +132,8 @@ contract SkillRegistry is Ownable, ReentrancyGuard {
 
     constructor(IERC20 usdc_) Ownable(msg.sender) {
         if (address(usdc_) == address(0)) revert ZeroAddress();
+        uint8 decimals = IERC20Metadata(address(usdc_)).decimals();
+        if (decimals != REQUIRED_USDC_DECIMALS) revert InvalidUSDCDecimals(decimals, REQUIRED_USDC_DECIMALS);
         usdc = usdc_;
     }
 
