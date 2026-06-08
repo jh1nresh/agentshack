@@ -71,12 +71,7 @@ contract AuditRegressionTest is Test {
         vm.prank(victim);   usdc.approve(address(router), type(uint256).max);
         vm.prank(attacker); usdc.approve(address(router), type(uint256).max);
 
-        // SkillRunToken.burn is called by the router with from=agent; since
-        // from != msg.sender, the token spends allowance. Approve once in setUp.
-        vm.prank(victim);
-        SkillRunToken(runTokenAddr).approve(address(router), type(uint256).max);
-        vm.prank(attacker);
-        SkillRunToken(runTokenAddr).approve(address(router), type(uint256).max);
+        // RUN_TOKEN burn is router-authorized; agents only approve USDC.
     }
 
     // ─────────────────────────────────────────────────────────
@@ -251,11 +246,9 @@ contract AuditRegressionTest is Test {
         vm.prank(address(router));
         registry.depositTreasury(skillId, PRICE);
 
-        // Victim approves new router on both USDC and the existing SkillRunToken.
+        // Victim approves new router for USDC only.
         vm.prank(victim);
         usdc.approve(address(newRouter), type(uint256).max);
-        vm.prank(victim);
-        SkillRunToken(runTokenAddr).approve(address(newRouter), type(uint256).max);
 
         // Redeem via new router — tokens + treasury NOT orphaned.
         vm.prank(victim);

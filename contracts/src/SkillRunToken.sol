@@ -29,6 +29,7 @@ contract SkillRunToken is ERC20 {
     address public immutable registry;
 
     error OnlyRouter();
+    error ZeroAddress();
 
     constructor(
         bytes32 skillId_,
@@ -36,6 +37,7 @@ contract SkillRunToken is ERC20 {
         string memory name_,
         string memory symbol_
     ) ERC20(name_, symbol_) {
+        if (registry_ == address(0)) revert ZeroAddress();
         skillId  = skillId_;
         registry = registry_;
     }
@@ -57,12 +59,10 @@ contract SkillRunToken is ERC20 {
     }
 
     /// @notice Burn `amount` tokens from `from`. Router-only (resolved live).
-    /// @dev If burning from a third-party address (not msg.sender), check
-    ///      allowance so the router cannot burn arbitrary holders' tokens
-    ///      without their approval.
+    /// @dev The authorised router owns execution/redeem flow checks and only
+    ///      burns caller-owned credits in the current SwapRouter implementation.
     function burn(address from, uint256 amount) external {
         if (msg.sender != router()) revert OnlyRouter();
-        if (from != msg.sender) _spendAllowance(from, msg.sender, amount);
         _burn(from, amount);
     }
 }

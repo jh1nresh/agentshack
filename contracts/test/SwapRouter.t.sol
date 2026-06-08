@@ -56,12 +56,7 @@ contract SwapRouterTest is Test {
         vm.prank(otherAgent);
         usdc.approve(address(router), type(uint256).max);
 
-        // Agents must also approve router to burn their RUN_TOKENs on executeSkill.
-        // Approval is set now even though tokens don't exist yet — ERC20 allows this.
-        vm.prank(agent);
-        SkillRunToken(runToken).approve(address(router), type(uint256).max);
-        vm.prank(otherAgent);
-        SkillRunToken(runToken).approve(address(router), type(uint256).max);
+        // RUN_TOKEN burn is router-authorized; agents only approve USDC.
     }
 
     // ── helpers ───────────────────────────────────────────────
@@ -141,6 +136,7 @@ contract SwapRouterTest is Test {
     function test_executeSkill_success() public {
         vm.prank(agent);
         router.buyRunToken(skillId, 3, type(uint256).max);
+        assertEq(SkillRunToken(runToken).allowance(agent, address(router)), 0);
 
         vm.prank(agent);
         bytes32 reqId = router.executeSkill(skillId, hex"deadbeef");
@@ -148,6 +144,7 @@ contract SwapRouterTest is Test {
         assertEq(SkillRunToken(runToken).balanceOf(agent), 2);
         assertEq(registry.treasury(skillId), PRICE * 2);
         assertEq(usdc.balanceOf(address(router)), PRICE); // escrowed
+        assertEq(router.totalEscrowed(), PRICE);
 
         assertEq(_reqAgent(reqId),  agent);
         assertEq(_reqAmount(reqId), PRICE);
@@ -229,6 +226,8 @@ contract SwapRouterTest is Test {
         assertEq(usdc.balanceOf(platform), expectedPlatform);
         assertEq(usdc.balanceOf(repPool),  expectedRep);
         assertEq(usdc.balanceOf(address(router)), 0);
+        assertEq(router.totalEscrowed(), 0);
+        assertEq(router.totalPendingWithdrawal(), 0);
 
         assertEq(uint8(_reqStatus(reqId)), uint8(SwapRouter.RequestStatus.Settled));
     }
@@ -242,6 +241,7 @@ contract SwapRouterTest is Test {
         router.settle(reqId, false, bytes32(0));
 
         assertEq(usdc.balanceOf(agent), balBefore); // full refund
+        assertEq(router.totalEscrowed(), 0);
         assertEq(uint8(_reqStatus(reqId)), uint8(SwapRouter.RequestStatus.Refunded));
     }
 
@@ -285,6 +285,7 @@ contract SwapRouterTest is Test {
         router.claimRefund(reqId);
 
         assertEq(usdc.balanceOf(agent), balBefore);
+        assertEq(router.totalEscrowed(), 0);
         assertEq(uint8(_reqStatus(reqId)), uint8(SwapRouter.RequestStatus.Refunded));
     }
 
@@ -333,6 +334,24 @@ contract SwapRouterTest is Test {
         router.setFees(6_000, 5_000); // sums to >=10000
     }
 
+    function test_rescueTokens_revertsWhenUsdcBacksOpenRequest() public {
+        vm.prank(agent);
+        router.swap(skillId, type(uint256).max, "");
+
+        vm.expectRevert(abi.encodeWithSelector(SwapRouter.InsufficientSurplus.selector, 1, 0));
+        router.rescueTokens(usdc, owner, 1);
+    }
+
+    function test_rescueTokens_allowsOnlyUsdcSurplus() public {
+        vm.prank(agent);
+        router.swap(skillId, type(uint256).max, "");
+        usdc.mint(address(router), 123);
+
+        router.rescueTokens(usdc, owner, 123);
+        assertEq(usdc.balanceOf(owner), 123);
+        assertEq(usdc.balanceOf(address(router)), PRICE);
+    }
+
     // ── lifecycle: register → buy → execute → settle ─────────
 
     function test_fullLifecycle() public {
@@ -341,7 +360,7 @@ contract SwapRouterTest is Test {
         router.buyRunToken(skillId, 5, type(uint256).max);
         assertEq(SkillRunToken(runToken).balanceOf(agent), 5);
 
-        // 2. Execute once (agent has pre-approved router via setUp).
+        // 2. Execute once.
         vm.prank(agent);
         bytes32 reqId = router.executeSkill(skillId, hex"01");
         assertEq(SkillRunToken(runToken).balanceOf(agent), 4);

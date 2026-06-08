@@ -86,6 +86,12 @@ contract SwapRouter is Ownable, ReentrancyGuard {
     ///         paused, etc.). Users / creators call {claimPending} to withdraw.
     mapping(address => uint256) public pendingWithdrawal;
 
+    /// @notice USDC backing currently pending execution requests.
+    uint256 public totalEscrowed;
+
+    /// @notice USDC backing failed push payments that recipients must claim.
+    uint256 public totalPendingWithdrawal;
+
     uint256 private _nonce;
 
     // ─────────────────────────────────────────────
@@ -145,6 +151,7 @@ contract SwapRouter is Ownable, ReentrancyGuard {
     error NotRequester();
     error PriceExceedsMax(uint256 actualPrice, uint256 maxPrice);
     error InsufficientTokenBalance(uint256 have, uint256 need);
+    error InsufficientSurplus(uint256 requested, uint256 available);
     error NothingPending();
 
     // ─────────────────────────────────────────────
@@ -295,6 +302,7 @@ contract SwapRouter is Ownable, ReentrancyGuard {
         if (r.status != RequestStatus.Pending) revert RequestNotPending(requestId);
 
         uint256 amount = r.amountUSDC;
+        totalEscrowed -= amount;
 
         if (success) {
             r.status = RequestStatus.Settled;
@@ -326,6 +334,7 @@ contract SwapRouter is Ownable, ReentrancyGuard {
         if (block.timestamp < r.timestamp + REQUEST_TTL) revert RequestNotExpired(requestId);
 
         r.status = RequestStatus.Refunded;
+        totalEscrowed -= r.amountUSDC;
         _safeCredit(r.agent, r.amountUSDC);
         emit ExecutionRefunded(requestId, r.agent, r.amountUSDC);
     }
@@ -336,6 +345,7 @@ contract SwapRouter is Ownable, ReentrancyGuard {
         uint256 amount = pendingWithdrawal[msg.sender];
         if (amount == 0) revert NothingPending();
         pendingWithdrawal[msg.sender] = 0;
+        totalPendingWithdrawal -= amount;
         usdc.safeTransfer(msg.sender, amount);
         emit PendingClaimed(msg.sender, amount);
     }
@@ -369,6 +379,12 @@ contract SwapRouter is Ownable, ReentrancyGuard {
     ///         creators are held in Request state and pendingWithdrawal.
     function rescueTokens(IERC20 token, address to, uint256 amount) external onlyOwner {
         if (to == address(0)) revert ZeroAddress();
+        if (address(token) == address(usdc)) {
+            uint256 liabilities = totalEscrowed + totalPendingWithdrawal;
+            uint256 balance = token.balanceOf(address(this));
+            uint256 available = balance > liabilities ? balance - liabilities : 0;
+            if (amount > available) revert InsufficientSurplus(amount, available);
+        }
         token.safeTransfer(to, amount);
         emit TokensRescued(address(token), to, amount);
     }
@@ -392,6 +408,7 @@ contract SwapRouter is Ownable, ReentrancyGuard {
     ) internal returns (bytes32 requestId) {
         unchecked { _nonce++; }
         requestId = keccak256(abi.encodePacked(skillId, agent, block.timestamp, _nonce, block.chainid));
+        totalEscrowed += amount;
         requests[requestId] = Request({
             skillId:           skillId,
             agent:             agent,
@@ -419,6 +436,7 @@ contract SwapRouter is Ownable, ReentrancyGuard {
         if (!success) {
             uint256 newBal = pendingWithdrawal[to] + amount;
             pendingWithdrawal[to] = newBal;
+            totalPendingWithdrawal += amount;
             emit PaymentDeferred(to, amount, newBal);
         }
     }

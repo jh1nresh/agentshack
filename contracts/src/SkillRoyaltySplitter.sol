@@ -43,6 +43,9 @@ contract SkillRoyaltySplitter is Ownable, ReentrancyGuard {
     /// @dev Replaces push-transfer so a USDC-blacklisted creator cannot DoS pay().
     mapping(address => uint256) public pendingWithdrawals;
 
+    /// @notice Aggregate USDC owed through {pendingWithdrawals}.
+    uint256 public totalPendingWithdrawals;
+
     /// @notice Minimum payment amount: 0.01 USDC (10000 units at 6 decimals)
     /// @dev Prevents zero-rounding where operator/creator get 0 on tiny amounts
     uint256 public constant MIN_AMOUNT = 10000;
@@ -73,6 +76,7 @@ contract SkillRoyaltySplitter is Ownable, ReentrancyGuard {
     error InvalidFeeSplit();
     error OperatorBpsTooLow();
     error TransferFailed(address recipient);
+    error InsufficientSurplus(uint256 requested, uint256 available);
     error NothingToWithdraw();
 
     // ── Constructor ────────────────────────────────────────
@@ -133,6 +137,7 @@ contract SkillRoyaltySplitter is Ownable, ReentrancyGuard {
         pendingWithdrawals[operator]       += operatorAmt;
         pendingWithdrawals[creator]        += creatorAmt;
         pendingWithdrawals[platformWallet] += platformAmt;
+        totalPendingWithdrawals            += amount;
 
         emit ServicePayment(skillId, operator, creator, amount, operatorAmt, creatorAmt, platformAmt);
     }
@@ -142,6 +147,7 @@ contract SkillRoyaltySplitter is Ownable, ReentrancyGuard {
         uint256 amount = pendingWithdrawals[msg.sender];
         if (amount == 0) revert NothingToWithdraw();
         pendingWithdrawals[msg.sender] = 0;
+        totalPendingWithdrawals -= amount;
         usdc.safeTransfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
     }
@@ -174,6 +180,11 @@ contract SkillRoyaltySplitter is Ownable, ReentrancyGuard {
      */
     function rescueTokens(IERC20 token, address to, uint256 amount) external onlyOwner {
         if (to == address(0)) revert InvalidAddress();
+        if (address(token) == address(usdc)) {
+            uint256 balance = token.balanceOf(address(this));
+            uint256 available = balance > totalPendingWithdrawals ? balance - totalPendingWithdrawals : 0;
+            if (amount > available) revert InsufficientSurplus(amount, available);
+        }
         token.safeTransfer(to, amount);
         emit TokensRescued(address(token), to, amount);
     }

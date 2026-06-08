@@ -157,10 +157,12 @@ contract SkillRoyaltySplitterTest is Test {
         uint256 contractBefore = usdc.balanceOf(address(splitter));
         vm.prank(buyer);
         splitter.pay(1, operator, AMOUNT);
+        assertEq(splitter.totalPendingWithdrawals(), AMOUNT);
         // After pull-pattern pay(), funds sit in pendingWithdrawals.
         // Once all recipients withdraw, nothing remains.
         _withdrawAll();
         assertEq(usdc.balanceOf(address(splitter)), contractBefore);
+        assertEq(splitter.totalPendingWithdrawals(), 0);
     }
 
     // ── AUDIT-2 M-2: rescueTokens ─────────────────────────
@@ -176,6 +178,24 @@ contract SkillRoyaltySplitterTest is Test {
         vm.prank(buyer);
         vm.expectRevert();
         splitter.rescueTokens(IERC20(address(usdc)), buyer, 1e6);
+    }
+
+    function test_rescueTokens_revertsWhenUsdcBacksPendingWithdrawals() public {
+        vm.prank(buyer);
+        splitter.pay(1, operator, AMOUNT);
+
+        vm.expectRevert(abi.encodeWithSelector(SkillRoyaltySplitter.InsufficientSurplus.selector, 1, 0));
+        splitter.rescueTokens(IERC20(address(usdc)), platform, 1);
+    }
+
+    function test_rescueTokens_allowsOnlyUsdcSurplus() public {
+        vm.prank(buyer);
+        splitter.pay(1, operator, AMOUNT);
+        usdc.mint(address(splitter), 123);
+
+        splitter.rescueTokens(IERC20(address(usdc)), platform, 123);
+        assertEq(usdc.balanceOf(platform), 1e6 + 123); // includes platform's SkillNFT purchase fee
+        assertEq(usdc.balanceOf(address(splitter)), AMOUNT);
     }
 
     // ── setFeeSplit ────────────────────────────────────────

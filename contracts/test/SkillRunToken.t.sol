@@ -58,11 +58,6 @@ contract SkillRunTokenTest is Test {
         vm.prank(routerAddr);
         token.mint(agent, 5);
 
-        // Agent must approve router to burn on their behalf (audit F7 fix:
-        // burn from third-party address requires explicit allowance).
-        vm.prank(agent);
-        token.approve(routerAddr, 3);
-
         // Router burns from agent
         vm.prank(routerAddr);
         token.burn(agent, 3);
@@ -76,6 +71,11 @@ contract SkillRunTokenTest is Test {
         vm.prank(attacker);
         vm.expectRevert(SkillRunToken.OnlyRouter.selector);
         token.burn(agent, 1);
+    }
+
+    function test_constructor_revertsOnZeroRegistry() public {
+        vm.expectRevert(SkillRunToken.ZeroAddress.selector);
+        new SkillRunToken(SKILL_ID, address(0), "bad", "BAD");
     }
 
     function test_transfer_allowedBetweenAgents() public {
