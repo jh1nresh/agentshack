@@ -142,16 +142,17 @@ async function loadWorkflow(id: string): Promise<WorkflowActionData | null> {
 export default async function WorkflowActionPage({
   params,
 }: {
-  params: { id: string; action: string };
+  params: Promise<{ id: string; action: string }>;
 }) {
-  if (!isWorkflowAction(params.action)) {
+  const { id, action } = await params;
+  if (!isWorkflowAction(action)) {
     notFound();
   }
 
-  const workflow = await loadWorkflow(params.id);
+  const workflow = await loadWorkflow(id);
   if (!workflow) {
     notFound();
   }
 
-  return <WorkflowActionClient action={params.action} workflow={workflow} />;
+  return <WorkflowActionClient action={action} workflow={workflow} />;
 }

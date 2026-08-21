@@ -1,0 +1,17 @@
+{
+  "contractVersion": "maiat-release-policy/v1",
+  "productionUrl": "https://maiat-dojo.vercel.app",
+  "application": {
+    "requiredActiveChain": "bscTestnet"
+  },
+  "contracts": {
+    "requiredMainnetAddresses": [
+      "agenticCommerceHooked",
+      "trustBasedEvaluator",
+      "evaluatorRegistry",
+      "dojoTrustScore"
+    ],
+    "expectedMainnetContractsReady": false,
+    "mainnetDeploymentStatus": "blocked-zero-addresses"
+  }
+}

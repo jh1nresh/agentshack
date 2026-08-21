@@ -12,8 +12,9 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const skipAuth =
       process.env.DOJO_SKIP_PRIVY_AUTH === 'true' &&
@@ -50,7 +51,7 @@ export async function GET(
 
     // Find skill
     const skill = await prisma.skill.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { creator: true },
     });
     if (!skill) {
@@ -66,7 +67,7 @@ export async function GET(
       const purchase = await prisma.purchase.findFirst({
         where: {
           userId: user.id,
-          skillId: params.id,
+          skillId: id,
           status: "completed",
         },
       });

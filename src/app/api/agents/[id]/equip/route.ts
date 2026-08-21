@@ -15,10 +15,11 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const agentId = params.id;
+    const agentId = id;
     const body = await req.json();
     const { privyId, skillId, unequip } = body;
 

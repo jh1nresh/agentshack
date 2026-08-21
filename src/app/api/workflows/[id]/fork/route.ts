@@ -34,8 +34,9 @@ function parseStepGraph(value: string) {
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   const auth = await authenticateWorkflowUser(req);
   if (!auth.ok) return auth.response;
   const { user } = auth;
@@ -48,7 +49,7 @@ export async function POST(
 
   const dbParent = await prisma.workflow.findFirst({
     where: {
-      OR: [{ id: params.id }, { slug: params.id }],
+      OR: [{ id }, { slug: id }],
     },
     include: {
       versions: {
@@ -57,7 +58,7 @@ export async function POST(
       },
     },
   });
-  const demoParent = dbParent ? null : getDemoSkillByWorkflowId(params.id);
+  const demoParent = dbParent ? null : getDemoSkillByWorkflowId(id);
   if (!dbParent && !demoParent) {
     return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
   }
@@ -169,7 +170,7 @@ export async function POST(
         fork: result.fork,
         offspring: {
           kind: 'offspring',
-          parent_workflow_id: dbParent?.id ?? demoParent?.workflowId ?? params.id,
+          parent_workflow_id: dbParent?.id ?? demoParent?.workflowId ?? id,
           child_workflow_id: result.child.id,
           style_branch: childSpirit.pattern,
           inherited_royalty_bps: result.child.royaltyBps,

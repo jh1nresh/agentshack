@@ -4,7 +4,11 @@ import { verifyPrivyAuth } from "@/lib/privy-server";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
   const body = await req.json();
   const { rating, comment, sessionId, userId: bodyUserId } = body;
   if (!rating || !comment) {
@@ -46,7 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
   if (
     !session ||
-    session.skillId !== params.id ||
+    session.skillId !== id ||
     session.agent.ownerId !== userId ||
     !["settled", "refunded"].includes(session.status)
   ) {
@@ -61,7 +65,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       sessionId,
       skillCall: {
         session: {
-          skillId: params.id,
+          skillId: id,
         },
       },
       settlementStatus: { in: ["paid", "refunded", "disputed"] },
@@ -77,21 +81,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // Check duplicate review for same session
   const existing = await prisma.review.findUnique({
-    where: { userId_skillId_sessionId: { userId, skillId: params.id, sessionId } },
+    where: { userId_skillId_sessionId: { userId, skillId: id, sessionId } },
   });
   if (existing) {
     return NextResponse.json({ error: "Already reviewed this session" }, { status: 409 });
   }
 
   const review = await prisma.review.create({
-    data: { rating: Number(rating), comment, userId, skillId: params.id, sessionId },
+    data: { rating: Number(rating), comment, userId, skillId: id, sessionId },
     include: { user: true },
   });
 
   // Update skill average rating
-  const agg = await prisma.review.aggregate({ where: { skillId: params.id }, _avg: { rating: true } });
+  const agg = await prisma.review.aggregate({ where: { skillId: id }, _avg: { rating: true } });
   if (agg._avg.rating) {
-    await prisma.skill.update({ where: { id: params.id }, data: { rating: agg._avg.rating } });
+    await prisma.skill.update({ where: { id }, data: { rating: agg._avg.rating } });
   }
 
   return NextResponse.json(review, { status: 201 });

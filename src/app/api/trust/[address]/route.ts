@@ -18,11 +18,10 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(
   _req: Request,
-  { params }: { params: { address: string } }
+  { params }: { params: Promise<{ address: string }> }
 ) {
+  const { address } = await params;
   try {
-    const address = params.address;
-
     // Validate address format
     if (!address || !address.match(/^0x[a-fA-F0-9]{40}$/)) {
       return NextResponse.json(

@@ -6,9 +6,10 @@ import AgentPageClient from './AgentPageClient';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AgentPage({ params }: { params: { id: string } }) {
+export default async function AgentPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const catalogAgent = AGENT_SERVICE_CARDS.find(
-    (agent) => agent.id === params.id || agent.slug === params.id,
+    (agent) => agent.id === id || agent.slug === id,
   );
 
   if (catalogAgent) {
@@ -16,7 +17,7 @@ export default async function AgentPage({ params }: { params: { id: string } }) 
   }
 
   const agent = await prisma.agent.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       owner: true,
       skills: { include: { skill: true } },

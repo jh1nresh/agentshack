@@ -68,9 +68,10 @@ interface SandboxRequestBody {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const demoSkill = getDemoSkillById(params.id);
+  const { id } = await params;
+  const demoSkill = getDemoSkillById(id);
   if (demoSkill) {
     let body: SandboxRequestBody;
     try {
@@ -110,7 +111,7 @@ export async function POST(
   }
 
   const skill = await prisma.skill.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: {
       id: true,
       name: true,

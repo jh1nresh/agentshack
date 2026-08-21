@@ -78,8 +78,9 @@ function validateEndpoint(endpointUrl: string) {
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   const auth = await authenticateWorkflowUser(req);
   if (!auth.ok) return auth.response;
   const { user } = auth;
@@ -97,7 +98,7 @@ export async function POST(
 
   const workflow = await prisma.workflow.findFirst({
     where: {
-      OR: [{ id: params.id }, { slug: params.id }],
+      OR: [{ id }, { slug: id }],
     },
     include: {
       skill: true,

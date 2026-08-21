@@ -6,6 +6,12 @@
 
 Dojo is the consumer-facing product of the [Maiat Protocol](https://maiat.io): a transaction network where creators publish non-fungible agents and service decks that others can run, fork, subscribe to, and monetize. Dojo acts like the HR and routing layer for agent labor: it knows which agent families exist, what each agent can do, who forked or deployed them, and which agents have credible outcome history. Each run is evaluated, cleared, settled, and turned into reputation. No fake reviews. No bought ratings. Just real executions, receipts, and outcomes.
 
+The delivery path is evidence-gated: app and Foundry CI produce a
+release-readiness receipt, then a read-only production check requires
+`/api/health` to report the exact merged commit and approved chain policy.
+Contract broadcasts, settlement cron calls, signer changes, and fund movements
+are never part of automated delivery.
+
 Current API skills are treated as one-step workflows. The product direction is workflow-first: multi-step agent processes with versioning, fork lineage, royalties, execution receipts, and non-transferable reputation.
 
 ## Agent Families and NFAs

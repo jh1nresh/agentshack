@@ -3,9 +3,13 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
   const skill = await prisma.skill.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       creator: true,
       reviews: { include: { user: true }, orderBy: { createdAt: "desc" } },
