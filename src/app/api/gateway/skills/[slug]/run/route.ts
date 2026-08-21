@@ -27,6 +27,7 @@ import { keccak256, toHex } from 'viem';
 import { createHmac } from 'node:crypto';
 import { prisma } from '@/lib/prisma';
 import { evaluateCall } from '@/lib/session-evaluator';
+import { decideRunClearing } from '@/lib/run-clearing';
 import { generateX402Headers } from '@/lib/x402';
 import { verifyGatewayAuth } from '@/lib/gateway-auth';
 import { recordWorkflowRun } from '@/lib/workflow-ledger';
@@ -553,13 +554,14 @@ export async function POST(
       latencyMs,
       timedOut || creatorRes === null || responseTooLarge
     );
+    const clearing = decideRunClearing(evalResult, session.pricePerCall);
 
     // -------------------------------------------------------------------------
     // 9. Write SkillCall + (conditionally) decrement budget — atomic transaction
     //
     // Budget decrement policy:
-    //   - Creator returned a response (any HTTP status) → decrement (creator burned compute)
-    //   - Network error / timeout → do NOT decrement (gateway-layer failure, refund implied)
+    //   - Evaluator PASS → decrement and write a paid receipt
+    //   - Evaluator FAIL → preserve budget and write a refunded receipt
     //
     // The @@unique([sessionId, nonce]) constraint catches replays → P2002 → 409
     // -------------------------------------------------------------------------
@@ -584,8 +586,8 @@ export async function POST(
 
     let workflowReceiptId: string | null = null;
     try {
-      if (creatorFailed) {
-        // No budget decrement on gateway-layer failure, but still write the final ledger.
+      if (!clearing.shouldCharge) {
+        // Evaluator failures preserve budget but still write the final ledger.
         await prisma.$transaction(async (tx) => {
           const skillCall = await tx.skillCall.create({
             data: {
@@ -595,7 +597,7 @@ export async function POST(
               status: skillCallStatus,
               httpStatus,
               latencyMs,
-              costUsdc: 0,
+              costUsdc: clearing.costUsdc,
               responseHash: evalResult.responseHash,
               delivered: evalResult.delivered,
               validFormat: evalResult.validFormat,
@@ -614,11 +616,13 @@ export async function POST(
             validFormat: evalResult.validFormat,
             withinSla: evalResult.withinSla,
             score: evalResult.score,
-            costUsdc: 0,
-            settlementStatus: 'refunded',
+            costUsdc: clearing.costUsdc,
+            settlementStatus: clearing.settlementStatus,
             httpStatus,
             latencyMs,
-            failureReason: responseReadError || (forwardError instanceof Error ? forwardError.message : null),
+            failureReason: responseReadError
+              || (forwardError instanceof Error ? forwardError.message : null)
+              || clearing.failureReason,
             provenance: {
               contextRefs: [
                 `gateway:${gatewaySlug}`,
@@ -630,8 +634,9 @@ export async function POST(
               ],
               planSummary: `Run active workflow ${gatewaySlug} through funded gateway session.`,
               artifactRefs: evalResult.responseHash ? [`response:${evalResult.responseHash}`] : [],
-              protocolUpdateSuggested: true,
-              failurePatchType: 'protocol',
+              skillUpdateSuggested: !creatorFailed,
+              protocolUpdateSuggested: creatorFailed,
+              failurePatchType: creatorFailed ? 'protocol' : 'skill',
               quotedPriceUsdc: session.pricePerCall,
               maxPriceUsdc: session.pricePerCall,
             },
@@ -639,7 +644,7 @@ export async function POST(
           workflowReceiptId = receipt?.id ?? null;
         });
       } else {
-        // Creator returned something (2xx or error) — charge the call atomically
+        // Evaluator passed — charge the call atomically.
         await prisma.$transaction(async (tx) => {
           const skillCall = await tx.skillCall.create({
             data: {
@@ -649,7 +654,7 @@ export async function POST(
               status: skillCallStatus,
               httpStatus,
               latencyMs,
-              costUsdc: session.pricePerCall,
+              costUsdc: clearing.costUsdc,
               responseHash: evalResult.responseHash,
               delivered: evalResult.delivered,
               validFormat: evalResult.validFormat,
@@ -668,8 +673,8 @@ export async function POST(
             validFormat: evalResult.validFormat,
             withinSla: evalResult.withinSla,
             score: evalResult.score,
-            costUsdc: session.pricePerCall,
-            settlementStatus: 'paid',
+            costUsdc: clearing.costUsdc,
+            settlementStatus: clearing.settlementStatus,
             httpStatus,
             latencyMs,
             provenance: {
@@ -761,14 +766,20 @@ export async function POST(
         { slug: gatewaySlug, httpStatus: creatorRes!.status }
       );
       const creatorBody = creatorBodyText;
+      const budgetAfter = clearing.shouldCharge
+        ? Math.max(0, session.budgetRemaining - session.pricePerCall)
+        : session.budgetRemaining;
+      const callCountAfter = clearing.shouldCharge
+        ? session.callCount + 1
+        : session.callCount;
       const responseHeaders = new Headers({
         'Content-Type': creatorRes!.headers.get('Content-Type') ?? 'application/json',
         'X-Dojo-SessionId': session.id,
-        'X-Dojo-BudgetRemaining': String(
-          Math.max(0, session.budgetRemaining - session.pricePerCall)
-        ),
-        'X-Dojo-CallCount': String(session.callCount + 1),
+        'X-Dojo-BudgetRemaining': String(budgetAfter),
+        'X-Dojo-CallCount': String(callCountAfter),
         'X-Dojo-CreatorHttpStatus': String(creatorRes!.status),
+        'X-Dojo-ClearingResult': clearing.result,
+        'X-Dojo-SettlementStatus': clearing.settlementStatus,
       });
       if (workflowReceiptId) {
         responseHeaders.set('X-Dojo-WorkflowReceiptId', workflowReceiptId);
@@ -783,8 +794,12 @@ export async function POST(
     // 10. Return creator response — pass through status + body + add X-Dojo-* headers
     // -------------------------------------------------------------------------
     const creatorBody = creatorBodyText;
-    const budgetAfter = Math.max(0, session.budgetRemaining - session.pricePerCall);
-    const callCountAfter = session.callCount + 1;
+    const budgetAfter = clearing.shouldCharge
+      ? Math.max(0, session.budgetRemaining - session.pricePerCall)
+      : session.budgetRemaining;
+    const callCountAfter = clearing.shouldCharge
+      ? session.callCount + 1
+      : session.callCount;
 
     console.log('[POST /api/gateway/skills/[slug]/run] Call succeeded:', {
       slug: gatewaySlug,
@@ -804,6 +819,8 @@ export async function POST(
       'X-Dojo-SessionId': session.id,
       'X-Dojo-BudgetRemaining': String(budgetAfter),
       'X-Dojo-CallCount': String(callCountAfter),
+      'X-Dojo-ClearingResult': clearing.result,
+      'X-Dojo-SettlementStatus': clearing.settlementStatus,
     });
     if (workflowReceiptId) {
       responseHeaders.set('X-Dojo-WorkflowReceiptId', workflowReceiptId);
