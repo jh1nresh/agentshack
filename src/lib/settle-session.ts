@@ -22,8 +22,7 @@ import { createSessionOnChain, closeAndSettleOnChain, getAcpConfig } from '@/lib
 import { signEvaluationProof } from '@/lib/gateway-signer';
 import { logInfo, logWarn, logError } from '@/lib/logger';
 import { reconcileSessionReceipts } from '@/lib/workflow-ledger';
-
-const PASS_THRESHOLD = 80; // ≥80% of calls must pass
+import { aggregateSessionClearing } from '@/lib/run-clearing';
 
 export interface SettleResult {
   success: boolean;
@@ -91,17 +90,21 @@ export async function settleSession(sessionId: string): Promise<SettleResult> {
   // 2. Aggregate SkillCall scores → PASS/FAIL
   const calls = await prisma.skillCall.findMany({
     where: { sessionId: session.id },
-    select: { score: true },
+    select: { score: true, costUsdc: true },
   });
 
-  const totalCalls = calls.length;
-  const passedCalls = calls.filter((c) => c.score > 0.5).length;
-  const passRate = totalCalls > 0 ? Math.round((passedCalls / totalCalls) * 100) : 0;
+  const {
+    recordedCalls,
+    totalCalls,
+    passedCalls,
+    passRate,
+    isPASS,
+  } = aggregateSessionClearing(calls);
   const finalScore = passRate;
-  const isPASS = totalCalls > 0 && passRate >= PASS_THRESHOLD;
 
   logInfo('settle:evaluate', 'score aggregated', {
     sessionId: session.id,
+    recordedCalls,
     totalCalls,
     passedCalls,
     passRate,

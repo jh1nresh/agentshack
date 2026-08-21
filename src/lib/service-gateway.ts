@@ -273,7 +273,7 @@ export function serviceDescriptor(
     pricing: {
       currency: 'USDC',
       per_run: skill.pricePerCall ?? 0,
-      refund_policy: 'Unreachable or timed-out endpoints return cost 0; evaluator-gated refund policy is the next clearing upgrade.',
+      refund_policy: 'Pay on evaluator PASS; delivery, format, or SLA failure returns cost 0 with a refunded receipt.',
     },
     authorization: {
       type: 'api_key',

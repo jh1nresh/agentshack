@@ -232,13 +232,18 @@ export async function reconcileSessionReceipts(
     error?: string | null;
   },
 ) {
+  const anchorData = {
+    ...(anchor?.status && { anchorStatus: anchor.status }),
+    ...(anchor?.settleTxHash !== undefined && { settleTxHash: anchor.settleTxHash }),
+    ...(anchor?.error !== undefined && { anchorError: anchor.error }),
+  };
+
   await tx.workflowRunReceipt.updateMany({
-    where: { sessionId },
-    data: {
-      settlementStatus,
-      ...(anchor?.status && { anchorStatus: anchor.status }),
-      ...(anchor?.settleTxHash !== undefined && { settleTxHash: anchor.settleTxHash }),
-      ...(anchor?.error !== undefined && { anchorError: anchor.error }),
-    },
+    where: settlementStatus === 'paid'
+      ? { sessionId, settlementStatus: 'paid' }
+      : { sessionId },
+    data: settlementStatus === 'paid'
+      ? anchorData
+      : { settlementStatus, ...anchorData },
   });
 }

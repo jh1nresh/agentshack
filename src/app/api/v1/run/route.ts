@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { evaluateCall } from '@/lib/session-evaluator';
+import { decideRunClearing } from '@/lib/run-clearing';
 import { settleSession } from '@/lib/settle-session';
 import {
   anchorExecutionAsync,
@@ -261,8 +262,9 @@ export async function POST(req: NextRequest) {
   const evalResult = evaluateCall(creatorStatus, creatorBody, latencyMs, failed);
 
   // --- Write SkillCall + decrement budget atomically ---
-  const shouldCharge = !failed && creatorStatus > 0;
-  const cost = shouldCharge ? pricePerCall : 0;
+  const clearing = decideRunClearing(evalResult, pricePerCall);
+  const shouldCharge = clearing.shouldCharge;
+  const cost = clearing.costUsdc;
   let workflowReceipt: WorkflowReceiptSummary | null = null;
   let postTransactionBalance = user.creditBalance;
 
@@ -297,7 +299,7 @@ export async function POST(req: NextRequest) {
         withinSla: evalResult.withinSla,
         score: evalResult.score,
         costUsdc: cost,
-        settlementStatus: shouldCharge ? 'paid' : 'refunded',
+        settlementStatus: clearing.settlementStatus,
         httpStatus: creatorStatus,
         latencyMs,
         failureReason: failureReason || null,
@@ -406,6 +408,15 @@ export async function POST(req: NextRequest) {
   const serviceRollups = await receiptRollupsByWorkflowId([skill.workflow.id]);
   const serviceSummary = serviceDescriptor(skill, serviceRollups.get(skill.workflow.id));
   const router = serviceRouterDescriptor(requestedService, matchedService);
+  const reputationUpdate = receiptForResponse
+    ? {
+        service: matchedService,
+        receipt_id: receiptForResponse.id,
+        workflow_id: receiptForResponse.workflowId,
+        score: evalResult.score,
+        settlement_status: receiptForResponse.settlementStatus,
+      }
+    : null;
   const buildReceiptResponse = () => (
     receiptForResponse
       ? {
@@ -413,7 +424,17 @@ export async function POST(req: NextRequest) {
           url: `/r/${receiptForResponse.id}`,
           workflow_id: receiptForResponse.workflowId,
           version_id: receiptForResponse.versionId,
+          clearing_result: clearing.result,
           settlement_status: receiptForResponse.settlementStatus,
+          evaluator: {
+            policy_id: clearing.policyId,
+            score: evalResult.score,
+            delivered: evalResult.delivered,
+            valid_format: evalResult.validFormat,
+            within_sla: evalResult.withinSla,
+            failure_reason: clearing.failureReason,
+          },
+          reputation_update: reputationUpdate,
           anchor_status: receiptForResponse.anchorStatus,
           onchain_request_id: receiptForResponse.onchainRequestId,
           swap_tx_hash: receiptForResponse.swapTxHash,
@@ -433,6 +454,25 @@ export async function POST(req: NextRequest) {
         service: serviceSummary,
         router,
         cost: 0,
+        balance: postTransactionBalance,
+        session_id: session.id,
+        receipt: receiptResponse,
+        workflow_receipt: receiptResponse,
+      },
+      { status: 502 },
+    );
+  }
+
+  if (creatorStatus < 200 || creatorStatus >= 300) {
+    const receiptResponse = buildReceiptResponse();
+    return NextResponse.json(
+      {
+        error: 'Service execution failed',
+        creator_status: creatorStatus,
+        result,
+        service: serviceSummary,
+        router,
+        cost,
         balance: postTransactionBalance,
         session_id: session.id,
         receipt: receiptResponse,
@@ -520,15 +560,7 @@ export async function POST(req: NextRequest) {
     session_id: session.id,
     receipt: receiptResponse,
     workflow_receipt: receiptResponse,
-    reputation_update: receiptForResponse
-      ? {
-          service: matchedService,
-          receipt_id: receiptForResponse.id,
-          workflow_id: receiptForResponse.workflowId,
-          score: evalResult.score,
-          settlement_status: receiptForResponse.settlementStatus,
-        }
-      : null,
+    reputation_update: reputationUpdate,
     latency_ms: latencyMs,
     ...(settleTriggered && { settle_triggered: true }),
     ...(onchainPromise && {
