@@ -12,11 +12,12 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const skill = await prisma.skill.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!skill) {
@@ -35,7 +36,7 @@ export async function POST(
 
     // Store evaluation result
     const updatedSkill = await prisma.skill.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         evaluationScore: result.score,
         evaluationPassed: result.passed,
@@ -43,7 +44,7 @@ export async function POST(
     });
 
     return NextResponse.json({
-      skillId: params.id,
+      skillId: id,
       evaluation: {
         passed: result.passed,
         score: result.score,
@@ -70,11 +71,12 @@ export async function POST(
  */
 export async function GET(
   _req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const skill = await prisma.skill.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true,
         name: true,
@@ -89,14 +91,14 @@ export async function GET(
 
     if (skill.evaluationScore === null) {
       return NextResponse.json({
-        skillId: params.id,
+        skillId: id,
         evaluated: false,
         message: "Skill has not been evaluated yet. POST to run evaluation.",
       });
     }
 
     return NextResponse.json({
-      skillId: params.id,
+      skillId: id,
       evaluated: true,
       evaluation: {
         passed: skill.evaluationPassed,

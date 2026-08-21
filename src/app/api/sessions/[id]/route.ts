@@ -14,10 +14,11 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const sessionId = params.id;
+    const sessionId = id;
 
     const authResult = await verifyPrivyAuth(req.headers.get('Authorization'));
     if (!authResult.success || !authResult.privyId) {

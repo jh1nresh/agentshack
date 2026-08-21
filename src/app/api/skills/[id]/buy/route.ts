@@ -37,10 +37,11 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const skillId = params.id;
+    const skillId = id;
     const body = await req.json();
     const { privyId, x402Proof, amount, currency, chain } = body;
 

@@ -18,11 +18,12 @@ function median(values: number[]): number | null {
     : sorted[mid];
 }
 
-export default async function SkillPage({ params }: { params: { id: string } }) {
+export default async function SkillPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   let skill = null;
   try {
     skill = await prisma.skill.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         creator: true,
         workflow: {
@@ -62,7 +63,7 @@ export default async function SkillPage({ params }: { params: { id: string } }) 
   }
 
   if (!skill) {
-    const demoSkill = getDemoSkillById(params.id);
+    const demoSkill = getDemoSkillById(id);
     if (!demoSkill) notFound();
 
     const publicSkill = toPublicSkill(demoSkill);
@@ -199,7 +200,7 @@ export default async function SkillPage({ params }: { params: { id: string } }) 
 
   // Reviews (public, newest first)
   const reviews = await prisma.review.findMany({
-    where: { skillId: params.id },
+    where: { skillId: id },
     orderBy: { createdAt: 'desc' },
     take: 20,
     include: {

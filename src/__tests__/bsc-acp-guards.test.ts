@@ -5,6 +5,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { randomBytes } from 'node:crypto';
+
+const testPrivateKey = (): `0x${string}` => `0x${randomBytes(32).toString('hex')}`;
 
 vi.mock('viem', () => ({
   createPublicClient: vi.fn(() => ({ readContract: vi.fn() })),
@@ -39,7 +42,7 @@ describe('createSessionOnChain guard paths', () => {
 
   it('skips when BSC_ACP_ADDRESS is zero address', async () => {
     process.env.BSC_ACP_ADDRESS = '0x0000000000000000000000000000000000000000';
-    process.env.DOJO_RELAYER_PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+    process.env.DOJO_RELAYER_PRIVATE_KEY = testPrivateKey();
     const { createSessionOnChain } = await import('@/lib/bsc-acp');
     const result = await createSessionOnChain(dummyParams);
     expect(result.success).toBe(false);
@@ -57,7 +60,7 @@ describe('createSessionOnChain guard paths', () => {
 
   it('skips when BSC_EVALUATOR_ADDRESS is zero address', async () => {
     process.env.BSC_ACP_ADDRESS = '0x1C86C5cAC643325534Ac2198f55B32A7A613f9F8';
-    process.env.DOJO_RELAYER_PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+    process.env.DOJO_RELAYER_PRIVATE_KEY = testPrivateKey();
     process.env.BSC_EVALUATOR_ADDRESS = '0x0000000000000000000000000000000000000000';
     const { createSessionOnChain } = await import('@/lib/bsc-acp');
     const result = await createSessionOnChain(dummyParams);

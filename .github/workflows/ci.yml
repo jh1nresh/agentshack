@@ -6,22 +6,30 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: maiat-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  ci:
+  app:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     env:
       DATABASE_URL: file:./test.db
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
 
-      - run: npm install
+      - run: npm ci
 
       - run: npx prisma generate
 
@@ -30,3 +38,72 @@ jobs:
       - run: npm run typecheck
 
       - run: npm test -- --run
+
+      - run: npm run build
+
+      - run: npm run audit:runtime
+
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: contracts
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: foundry-rs/foundry-toolchain@b00af27efadbc7b4ca8b82abbd903b17cc874d2a # v1.9.0
+        with:
+          version: stable
+
+      - name: Install pinned contract dependencies
+        run: |
+          mkdir -p lib/forge-std lib/openzeppelin-contracts
+          git -C lib/forge-std init
+          git -C lib/forge-std remote add origin https://github.com/foundry-rs/forge-std.git
+          git -C lib/forge-std fetch --depth 1 origin 0844d7e1fc5e60d77b68e469bff60265f236c398
+          git -C lib/forge-std checkout --detach FETCH_HEAD
+          git -C lib/openzeppelin-contracts init
+          git -C lib/openzeppelin-contracts remote add origin https://github.com/OpenZeppelin/openzeppelin-contracts.git
+          git -C lib/openzeppelin-contracts fetch --depth 1 origin 5fd1781b1454fd1ef8e722282f86f9293cacf256
+          git -C lib/openzeppelin-contracts checkout --detach FETCH_HEAD
+
+      - name: Build contracts with size report
+        run: forge build --sizes
+
+      - name: Run unit, regression, and fuzz tests
+        run: forge test -vv
+
+  release-readiness:
+    if: github.event_name == 'push'
+    needs: [app, contracts]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 20
+
+      - name: Write release-readiness receipt
+        run: |
+          node scripts/write-maiat-release-readiness.mjs \
+            --policy config/maiat-release-policy.json \
+            --expected-commit "$GITHUB_SHA" \
+            --repository "$GITHUB_REPOSITORY" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --output "$RUNNER_TEMP/maiat-release-readiness.json"
+          python3 -m json.tool "$RUNNER_TEMP/maiat-release-readiness.json" >/dev/null
+
+      - name: Upload release-readiness receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: maiat-release-readiness-${{ github.sha }}
+          path: ${{ runner.temp }}/maiat-release-readiness.json
+          if-no-files-found: error
+          retention-days: 14

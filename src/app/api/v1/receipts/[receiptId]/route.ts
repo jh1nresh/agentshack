@@ -25,10 +25,11 @@ function safeJsonArray(value: string | null): unknown[] {
  */
 export async function GET(
   _req: Request,
-  { params }: { params: { receiptId: string } },
+  { params }: { params: Promise<{ receiptId: string }> },
 ) {
+  const { receiptId } = await params;
   const receipt = await prisma.workflowRunReceipt.findUnique({
-    where: { id: params.receiptId },
+    where: { id: receiptId },
     include: {
       workflow: {
         select: {

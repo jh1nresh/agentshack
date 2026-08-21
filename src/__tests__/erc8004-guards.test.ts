@@ -5,6 +5,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { randomBytes } from 'node:crypto';
+
+const testPrivateKey = (): `0x${string}` => `0x${randomBytes(32).toString('hex')}`;
 
 // Mock viem before importing the module under test
 vi.mock('viem', () => ({
@@ -89,7 +92,7 @@ describe('createBscWalletClient', () => {
   });
 
   it('returns a client when key is set', async () => {
-    process.env.DOJO_RELAYER_PRIVATE_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+    process.env.DOJO_RELAYER_PRIVATE_KEY = testPrivateKey();
     const { createBscWalletClient } = await import('@/lib/erc8004');
     const client = createBscWalletClient();
     expect(client).toBeDefined();

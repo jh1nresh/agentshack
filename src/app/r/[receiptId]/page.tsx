@@ -53,9 +53,14 @@ function bscTxUrl(hash: string | null) {
   return hash ? `https://testnet.bscscan.com/tx/${hash}` : null;
 }
 
-export default async function ReceiptPage({ params }: { params: { receiptId: string } }) {
+export default async function ReceiptPage({
+  params,
+}: {
+  params: Promise<{ receiptId: string }>;
+}) {
+  const { receiptId } = await params;
   const receipt = await prisma.workflowRunReceipt.findUnique({
-    where: { id: params.receiptId },
+    where: { id: receiptId },
     include: {
       workflow: {
         select: {

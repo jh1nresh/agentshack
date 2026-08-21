@@ -45,6 +45,10 @@ function makeRequest(url: string, opts: RequestInit = {}) {
   return req as any; // NextRequest-compatible for our tests
 }
 
+function routeParams(id: string) {
+  return { params: Promise.resolve({ id }) };
+}
+
 describe('GET /api/skills/[id]/reviews', () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -55,7 +59,7 @@ describe('GET /api/skills/[id]/reviews', () => {
 
     const res = await getReviews(
       makeRequest('http://localhost/api/skills/sk1/reviews'),
-      { params: { id: 'sk1' } }
+      routeParams('sk1')
     );
     const data = await res.json();
 
@@ -69,7 +73,7 @@ describe('GET /api/skills/[id]/reviews', () => {
 
     const res = await getReviews(
       makeRequest('http://localhost/api/skills/sk1/reviews'),
-      { params: { id: 'sk1' } }
+      routeParams('sk1')
     );
     const data = await res.json();
 
@@ -92,7 +96,7 @@ describe('POST /api/skills/[id]/review', () => {
         method: 'POST',
         body: JSON.stringify({ sessionId: 'sess1', userId: 'u1' }),
       }),
-      { params: { id: 'sk1' } }
+      routeParams('sk1')
     );
     const data = await res.json();
 
@@ -106,7 +110,7 @@ describe('POST /api/skills/[id]/review', () => {
         method: 'POST',
         body: JSON.stringify({ rating: 5, comment: 'Nice', userId: 'u1' }),
       }),
-      { params: { id: 'sk1' } }
+      routeParams('sk1')
     );
     const data = await res.json();
 
@@ -120,7 +124,7 @@ describe('POST /api/skills/[id]/review', () => {
         method: 'POST',
         body: JSON.stringify({ rating: 5, comment: 'Nice', sessionId: 'sess1' }),
       }),
-      { params: { id: 'sk1' } }
+      routeParams('sk1')
     );
     const data = await res.json();
 
@@ -136,7 +140,7 @@ describe('POST /api/skills/[id]/review', () => {
         method: 'POST',
         body: JSON.stringify({ rating: 5, comment: 'Nice', sessionId: 'sess1', userId: 'u1' }),
       }),
-      { params: { id: 'sk1' } }
+      routeParams('sk1')
     );
     const data = await res.json();
 
@@ -157,7 +161,7 @@ describe('POST /api/skills/[id]/review', () => {
         method: 'POST',
         body: JSON.stringify({ rating: 5, comment: 'Nice', sessionId: 'sess1', userId: 'u1' }),
       }),
-      { params: { id: 'sk1' } }
+      routeParams('sk1')
     );
 
     expect(res.status).toBe(403);
@@ -178,7 +182,7 @@ describe('POST /api/skills/[id]/review', () => {
         method: 'POST',
         body: JSON.stringify({ rating: 5, comment: 'Nice', sessionId: 'sess1', userId: 'u1' }),
       }),
-      { params: { id: 'sk1' } }
+      routeParams('sk1')
     );
     const data = await res.json();
 
@@ -200,7 +204,7 @@ describe('POST /api/skills/[id]/review', () => {
         method: 'POST',
         body: JSON.stringify({ rating: 5, comment: 'Nice', sessionId: 'sess1', userId: 'u1' }),
       }),
-      { params: { id: 'sk1' } }
+      routeParams('sk1')
     );
     const data = await res.json();
 
@@ -234,7 +238,7 @@ describe('POST /api/skills/[id]/review', () => {
         method: 'POST',
         body: JSON.stringify({ rating: 5, comment: 'Excellent', sessionId: 'sess1', userId: 'u1' }),
       }),
-      { params: { id: 'sk1' } }
+      routeParams('sk1')
     );
     const data = await res.json();
 

@@ -95,10 +95,11 @@ async function requireRegisteredWorkflow(gatewaySlug: string): Promise<NextRespo
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { slug: string } }
+  { params }: { params: Promise<{ slug: string }> }
 ) {
+  const { slug } = await params;
   try {
-    const gatewaySlug = params.slug;
+    const gatewaySlug = slug;
 
     // -------------------------------------------------------------------------
     // 1. Parse headers — all required
