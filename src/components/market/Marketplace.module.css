@@ -977,6 +977,38 @@
   border-left-color: #0ecb81;
 }
 
+.errorNote {
+  margin: 0 0 14px;
+  padding: 12px;
+  border-left: 3px solid #f6465d;
+  background: var(--market-base);
+  color: #ff8796;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.receiptData {
+  max-height: 210px;
+  overflow: auto;
+  margin: 0 0 14px;
+  padding: 12px;
+  border: 1px solid var(--market-line);
+  background: var(--market-base);
+  color: #aeb6c2;
+  font-family: var(--font-mono), ui-monospace, Menlo, monospace;
+  font-size: 8px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.primaryButton:disabled {
+  border-color: var(--market-line-strong);
+  background: var(--market-line);
+  color: var(--market-muted);
+  cursor: not-allowed;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .connectButton,
   .primaryButton,
