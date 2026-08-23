@@ -5,48 +5,45 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import {
   BNB_AGENT_CATEGORIES,
-  BNB_MARKETPLACE_AGENTS,
   getBnbAgentCategory,
   type BnbAgentCategorySlug,
 } from "@/lib/bnb-marketplace";
+import { useBnbMarketplaceAgents } from "@/hooks/useBnbMarketplaceAgents";
 import styles from "./Marketplace.module.css";
 
 type MarketDirectoryProps = {
   initialCategory?: string;
 };
 
-function money(value: number) {
-  return `$${value.toLocaleString()}`;
-}
-
 export function MarketDirectory({ initialCategory }: MarketDirectoryProps) {
+  const { agents, complete } = useBnbMarketplaceAgents();
   const validInitialCategory = getBnbAgentCategory(initialCategory ?? "")?.slug;
   const [category, setCategory] = useState<BnbAgentCategorySlug | "all">(validInitialCategory ?? "all");
   const [query, setQuery] = useState("");
 
   const visibleAgents = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    return BNB_MARKETPLACE_AGENTS.filter((agent) => {
+    return agents.filter((agent) => {
       const agentCategory = getBnbAgentCategory(agent.category);
       const inCategory = category === "all" || agent.category === category;
       const matchesQuery = !normalized || [agent.name, agent.summary, agent.task, agent.protocol, agentCategory?.name ?? ""]
         .some((value) => value.toLowerCase().includes(normalized));
       return inCategory && matchesQuery;
     });
-  }, [category, query]);
+  }, [agents, category, query]);
 
   const [selectedSlug, setSelectedSlug] = useState(validInitialCategory
-    ? BNB_MARKETPLACE_AGENTS.find((agent) => agent.category === validInitialCategory)?.slug ?? BNB_MARKETPLACE_AGENTS[0].slug
-    : BNB_MARKETPLACE_AGENTS[0].slug);
+    ? agents.find((agent) => agent.category === validInitialCategory)?.slug ?? agents[0].slug
+    : agents[0].slug);
 
-  const selected = visibleAgents.find((agent) => agent.slug === selectedSlug) ?? visibleAgents[0] ?? BNB_MARKETPLACE_AGENTS[0];
+  const selected = visibleAgents.find((agent) => agent.slug === selectedSlug) ?? visibleAgents[0] ?? agents[0];
   const selectedCategory = getBnbAgentCategory(selected.category);
 
   function chooseCategory(nextCategory: BnbAgentCategorySlug | "all") {
     setCategory(nextCategory);
     const firstAgent = nextCategory === "all"
-      ? BNB_MARKETPLACE_AGENTS[0]
-      : BNB_MARKETPLACE_AGENTS.find((agent) => agent.category === nextCategory);
+      ? agents[0]
+      : agents.find((agent) => agent.category === nextCategory);
     if (firstAgent) setSelectedSlug(firstAgent.slug);
   }
 
@@ -54,8 +51,8 @@ export function MarketDirectory({ initialCategory }: MarketDirectoryProps) {
     <>
       <section className={styles.focusPanel} aria-labelledby="selected-agent-title">
         <div className={styles.meta}>
-          <span>SELECTED AGENT / DEMO</span>
-          <span className={styles.demoStatus}>● CONCEPT DATA</span>
+          <span>SELECTED AGENT / BSC TESTNET</span>
+          <span className={styles.demoStatus}>● {selected.registryStatus === "live" ? "ONCHAIN IDENTITY" : "CHECKING REGISTRY"}</span>
         </div>
 
         <div className={styles.agentHeading}>
@@ -68,15 +65,15 @@ export function MarketDirectory({ initialCategory }: MarketDirectoryProps) {
         </div>
         <p className={styles.panelLead}>{selected.summary}</p>
 
-        <section className={styles.boundary} aria-label={`${selected.name} example settings`}>
+        <section className={styles.boundary} aria-label={`${selected.name} testnet job`}>
           <div className={styles.boundaryHeader}>
-            <span>EXAMPLE SETTINGS</span>
-            <strong>CHANGE ANYTIME</strong>
+            <span>TESTNET JOB</span>
+            <strong>CHAIN 97 ONLY</strong>
           </div>
           <div className={styles.boundaryGrid}>
             <div><small>Can do</small><strong>{selected.task}</strong></div>
-            <div><small>Daily limit</small><strong>{money(selected.dailyLimitUsd)}</strong></div>
-            <div><small>Ends after</small><strong>{selected.defaultDurationDays} days</strong></div>
+            <div><small>Service fee</small><strong>{selected.feeLabel}</strong></div>
+            <div><small>Identity</small><strong>ERC-8004 #{selected.agentId}</strong></div>
           </div>
           <p className={styles.boundaryNote}><strong>Cannot:</strong> {selected.cannotDo}</p>
         </section>
@@ -86,14 +83,14 @@ export function MarketDirectory({ initialCategory }: MarketDirectoryProps) {
           <Link href={`/?q=${selectedCategory?.slug ?? ""}`} className={styles.secondaryButton}>Categories</Link>
         </div>
         <div className={styles.controlNote}>
-          <strong>You keep the keys.</strong>
-          <span>Live permission controls are not connected in this demo.</span>
+          <strong>You approve every testnet transaction.</strong>
+          <span>No mainnet transaction or server-held key.</span>
         </div>
       </section>
 
       <section className={styles.listPanel} aria-labelledby="market-list-title">
         <div className={styles.listHeader}>
-          <span className={styles.kicker}>AGENT MARKET / DEMO FIXTURES</span>
+          <span className={styles.kicker}>AGENT MARKET / {complete ? "LIVE TESTNET DATA" : "REGISTRY CHECK"}</span>
           <h2 id="market-list-title" className={styles.panelTitle}>Pick one job<br />to automate.</h2>
           <label className={styles.searchLabel}>
             Search agents
@@ -133,7 +130,7 @@ export function MarketDirectory({ initialCategory }: MarketDirectoryProps) {
         </div>
 
         <div className={`${styles.agentTableRow} ${styles.tableLabels}`} aria-hidden="true">
-          <span>Agent</span><span>Job</span><span>Risk</span><span />
+          <span>Agent</span><span>Job</span><span>Status</span><span />
         </div>
 
         {visibleAgents.map((agent) => (
@@ -146,14 +143,14 @@ export function MarketDirectory({ initialCategory }: MarketDirectoryProps) {
           >
             <span className={styles.agentCell}><i>{agent.initials}</i><b>{agent.name}</b></span>
             <span>{agent.task}</span>
-            <span>{agent.risk}</span>
+            <span>{agent.endpointStatus === "live" ? "Live" : "Checking"}</span>
             <span className={styles.viewLink}>View →</span>
           </button>
         ))}
 
         {visibleAgents.length === 0 && (
           <div className={styles.emptyState}>
-            <strong>No demo agents found</strong>
+            <strong>No testnet agents found</strong>
             <p>Clear the search or choose another category.</p>
           </div>
         )}

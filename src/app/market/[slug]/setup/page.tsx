@@ -16,8 +16,8 @@ export default async function PermissionSetupPage({ params }: { params: Promise<
     <MarketplaceFrame
       layout="directory"
       primaryWord="SET"
-      accentWord="LIMITS"
-      note={"Nothing runs\nuntil you\napprove it."}
+      accentWord="TESTNET"
+      note={"Every call is\nchain 97 only.\nYou approve it."}
     >
       <PermissionSetup agent={agent} />
     </MarketplaceFrame>

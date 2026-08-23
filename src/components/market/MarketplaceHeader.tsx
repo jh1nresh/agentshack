@@ -25,7 +25,7 @@ export function MarketplaceHeader() {
       </nav>
 
       <div className={styles.network}>
-        <span className={styles.networkLabel}>BNB SMART CHAIN</span>
+        <span className={styles.networkLabel}>BSC TESTNET · 97</span>
         {ready && authenticated ? (
           <button type="button" className={styles.connectButton} onClick={logout} aria-label="Disconnect wallet">
             {accountLabel}
