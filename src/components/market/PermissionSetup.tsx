@@ -14,6 +14,7 @@ import {
   bnbMarketplaceTokenAbi,
 } from "@/lib/bnb-marketplace-chain";
 import { useBnbMarketplaceAgents } from "@/hooks/useBnbMarketplaceAgents";
+import { getMarketplaceActivationAction } from "@/lib/bnb-marketplace-activation-flow";
 import styles from "./Marketplace.module.css";
 
 type StepState = "waiting" | "active" | "done" | "error";
@@ -59,6 +60,16 @@ export function PermissionSetup({ agent }: { agent: BnbMarketplaceAgent }) {
     return receipt;
   }
 
+  async function requestDelivery(fundedJobId: string, fundedQuote: Quote) {
+    updateStep(5, { state: "active" });
+    const deliveryBody = await responseJson(await fetch("/api/bnb-marketplace/activate", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "notify_funded", slug: liveAgent.slug, jobId: fundedJobId, quoteHash: fundedQuote.quoteHash }),
+    }));
+    setResult(deliveryBody.result as Record<string, unknown>);
+    updateStep(5, { state: "done" });
+  }
+
   async function activate() {
     if (!authenticated) {
       login();
@@ -71,10 +82,10 @@ export function PermissionSetup({ agent }: { agent: BnbMarketplaceAgent }) {
     setRunning(true);
     setError(null);
     setResult(null);
-    setSteps(INITIAL_STEPS);
 
     try {
-      if (!quote) {
+      const action = getMarketplaceActivationAction(Boolean(quote), jobId);
+      if (action === "quote") {
         const quoteBody = await responseJson(await fetch("/api/bnb-marketplace/activate", {
           method: "POST", headers: { "content-type": "application/json" },
           body: JSON.stringify({ action: "quote", slug: liveAgent.slug }),
@@ -82,6 +93,16 @@ export function PermissionSetup({ agent }: { agent: BnbMarketplaceAgent }) {
         setQuote(quoteBody.quote as Quote);
         return;
       }
+
+      if (!quote) throw new Error("Signed quote is no longer available.");
+      const nextQuote = quote;
+      if (action === "notify") {
+        if (!jobId) throw new Error("Funded job is no longer available.");
+        await requestDelivery(jobId, nextQuote);
+        return;
+      }
+
+      setSteps(INITIAL_STEPS);
 
       const wallet = wallets[0];
       if (!wallet) throw new Error("Connect a BSC Testnet wallet first.");
@@ -91,7 +112,6 @@ export function PermissionSetup({ agent }: { agent: BnbMarketplaceAgent }) {
       const walletClient = createWalletClient({ account, chain: BNB_MARKETPLACE_CHAIN, transport: custom(provider) });
       const publicClient = createPublicClient({ chain: BNB_MARKETPLACE_CHAIN, transport: http() });
 
-      const nextQuote = quote;
       const feeAmount = BigInt(nextQuote.feeAmount);
       const description = JSON.stringify({
         version: 1, task: liveAgent.task, agentId: liveAgent.agentId, quoteHash: nextQuote.quoteHash,
@@ -111,7 +131,6 @@ export function PermissionSetup({ agent }: { agent: BnbMarketplaceAgent }) {
       const created = parseEventLogs({ abi: bnbMarketplaceCommerceAbi, eventName: "JobCreated", logs: createReceipt.logs });
       const nextJobId = created[0]?.args.jobId;
       if (nextJobId === undefined) throw new Error("Confirmed createJob receipt did not contain JobCreated.");
-      setJobId(nextJobId.toString());
       updateStep(0, { state: "done", hash: createHash });
 
       updateStep(1, { state: "active" });
@@ -149,14 +168,9 @@ export function PermissionSetup({ agent }: { agent: BnbMarketplaceAgent }) {
       updateStep(4, { state: "active", hash: fundHash });
       await waitForSuccess(publicClient, fundHash);
       updateStep(4, { state: "done", hash: fundHash });
-
-      updateStep(5, { state: "active" });
-      const deliveryBody = await responseJson(await fetch("/api/bnb-marketplace/activate", {
-        method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "notify_funded", slug: liveAgent.slug, jobId: nextJobId.toString(), quoteHash: nextQuote.quoteHash }),
-      }));
-      setResult(deliveryBody.result as Record<string, unknown>);
-      updateStep(5, { state: "done" });
+      const fundedJobId = nextJobId.toString();
+      setJobId(fundedJobId);
+      await requestDelivery(fundedJobId, nextQuote);
     } catch (cause) {
       setSteps((current) => current.map((step) => step.state === "active" ? { ...step, state: "error" } : step));
       setError(cause instanceof Error ? cause.message : "Testnet activation failed");
@@ -227,7 +241,7 @@ export function PermissionSetup({ agent }: { agent: BnbMarketplaceAgent }) {
           onClick={activate}
           disabled={!ready || running || !activationReady || Boolean(result)}
         >
-          {!authenticated ? "Connect wallet →" : running ? "Waiting…" : result ? "Activated on testnet ✓" : quote ? "Fund testnet job →" : "Request signed quote →"}
+          {!authenticated ? "Connect wallet →" : running ? "Waiting…" : result ? "Activated on testnet ✓" : jobId ? "Retry delivery →" : quote ? "Fund testnet job →" : "Request signed quote →"}
         </button>
         <Link href={`/market/${liveAgent.slug}`} className={`${styles.secondaryButton} ${styles.fullWidth}`}>Back to agent</Link>
         <small className={styles.finePrint}>Requires testnet BNB for gas and the quoted test $U fee. No private key is sent to AgentShack or the seller.</small>

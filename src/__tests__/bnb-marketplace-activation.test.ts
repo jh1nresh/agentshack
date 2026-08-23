@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { activationRequestSchema, dispatchTestnetActivation } from "@/lib/bnb-marketplace-activation";
+import { getMarketplaceActivationAction } from "@/lib/bnb-marketplace-activation-flow";
 import { BNB_MARKETPLACE_AGENTS } from "@/lib/bnb-marketplace";
 
 afterEach(() => vi.restoreAllMocks());
@@ -29,6 +30,12 @@ function randomPositiveBigInt(random: () => number, max: bigint) {
 }
 
 describe("BNB marketplace activation boundary", () => {
+  it("resumes delivery without funding a confirmed job again", () => {
+    expect(getMarketplaceActivationAction(false, null)).toBe("quote");
+    expect(getMarketplaceActivationAction(true, null)).toBe("fund");
+    expect(getMarketplaceActivationAction(true, "42")).toBe("notify");
+  });
+
   it("accepts only the curated slug and never a caller supplied endpoint", async () => {
     expect(activationRequestSchema.safeParse({ action: "quote", slug: "studio-desk-grid", endpoint: "https://evil.example" }).success).toBe(false);
     await expect(dispatchTestnetActivation({ action: "quote", slug: "missing" })).rejects.toThrow("Unknown BSC Testnet agent");
@@ -73,6 +80,29 @@ describe("BNB marketplace activation boundary", () => {
 
     await expect(dispatchTestnetActivation({ action: "quote", slug: agent.slug }))
       .rejects.toThrow("Quote exceeds the curated testnet fee cap");
+  });
+
+  it("rejects and cancels a streamed seller response above the byte limit", async () => {
+    const encoder = new TextEncoder();
+    const chunks = ["x".repeat(60_000), "y".repeat(40_001), "z".repeat(60_000)];
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const chunk = chunks.shift();
+        if (chunk === undefined) controller.close();
+        else controller.enqueue(encoder.encode(chunk));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(body, { status: 200, headers: { "content-length": "1" } }),
+    );
+
+    await expect(dispatchTestnetActivation({ action: "quote", slug: BNB_MARKETPLACE_AGENTS[0].slug }))
+      .rejects.toThrow("Agent response exceeded 100 KB");
+    expect(cancelled).toBe(true);
   });
 
   it("notifies delivery only with a funded job id and quote hash", async () => {
@@ -199,6 +229,18 @@ describe("BNB marketplace activation boundary", () => {
 
       await expect(dispatchTestnetActivation({ action: "quote", slug: agent.slug }))
         .rejects.toThrow();
+    }
+  });
+
+  it("property: every funded job resumes at delivery instead of funding", () => {
+    const random = seededRandom(FUZZ_SEED ^ 0xf00d);
+
+    for (let index = 0; index < FUZZ_CASES; index++) {
+      const jobId = randomPositiveBigInt(random, 2n ** 255n).toString();
+      expect(
+        getMarketplaceActivationAction(true, jobId),
+        `seed=${FUZZ_SEED ^ 0xf00d} case=${index} jobId=${jobId}`,
+      ).toBe("notify");
     }
   });
 });

@@ -1,32 +1,25 @@
 export const CREATOR_RESPONSE_MAX_BYTES = 1_048_576;
 
-export type CreatorResponseRead =
+export type BoundedResponseRead =
   | { ok: true; text: string }
   | { ok: false; text: ''; error: string };
 
-export async function readCreatorResponseText(
+export async function readBoundedResponseText(
   response: Response,
-  maxBytes = CREATOR_RESPONSE_MAX_BYTES,
-): Promise<CreatorResponseRead> {
+  maxBytes: number,
+  error: string,
+): Promise<BoundedResponseRead> {
   const contentLength = Number(response.headers.get('content-length') ?? 0);
   if (contentLength > maxBytes) {
-    return {
-      ok: false,
-      text: '',
-      error: `Creator response exceeds ${maxBytes} bytes`,
-    };
+    return { ok: false, text: '', error };
   }
 
   if (!response.body) {
     const text = await response.text();
-    if (Buffer.byteLength(text, 'utf8') <= maxBytes) {
+    if (new TextEncoder().encode(text).byteLength <= maxBytes) {
       return { ok: true, text };
     }
-    return {
-      ok: false,
-      text: '',
-      error: `Creator response exceeds ${maxBytes} bytes`,
-    };
+    return { ok: false, text: '', error };
   }
 
   const reader = response.body.getReader();
@@ -40,12 +33,8 @@ export async function readCreatorResponseText(
       if (done) break;
       bytesRead += value.byteLength;
       if (bytesRead > maxBytes) {
-        await reader.cancel();
-        return {
-          ok: false,
-          text: '',
-          error: `Creator response exceeds ${maxBytes} bytes`,
-        };
+        await reader.cancel().catch(() => undefined);
+        return { ok: false, text: '', error };
       }
       chunks.push(decoder.decode(value, { stream: true }));
     }
@@ -54,4 +43,17 @@ export async function readCreatorResponseText(
   } finally {
     reader.releaseLock();
   }
+}
+
+export type CreatorResponseRead = BoundedResponseRead;
+
+export async function readCreatorResponseText(
+  response: Response,
+  maxBytes = CREATOR_RESPONSE_MAX_BYTES,
+): Promise<CreatorResponseRead> {
+  return readBoundedResponseText(
+    response,
+    maxBytes,
+    `Creator response exceeds ${maxBytes} bytes`,
+  );
 }

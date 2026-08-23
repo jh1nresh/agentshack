@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BNB_MARKETPLACE_AGENTS, type BnbMarketplaceAgent } from "@/lib/bnb-marketplace";
+import { readBoundedResponseText } from "@/lib/creator-response";
 
 const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/);
 const hashSchema = z.string().regex(/^0x[a-fA-F0-9]{64}$/);
@@ -19,9 +20,9 @@ function sameAddress(a: string, b: string) {
 async function checkedJson(url: string, init?: RequestInit) {
   const response = await fetch(url, { ...init, redirect: "error", signal: AbortSignal.timeout(8_000), next: { revalidate: 60 } });
   if (!response.ok) throw new Error(`Upstream returned ${response.status}`);
-  const text = await response.text();
-  if (text.length > 100_000) throw new Error("Upstream response too large");
-  return JSON.parse(text) as unknown;
+  const read = await readBoundedResponseText(response, 100_000, "Upstream response too large");
+  if (!read.ok) throw new Error(read.error);
+  return JSON.parse(read.text) as unknown;
 }
 
 export async function loadBnbMarketplaceAgent(agent: BnbMarketplaceAgent): Promise<BnbMarketplaceAgent> {

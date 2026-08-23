@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { getBnbMarketplaceAgent } from "@/lib/bnb-marketplace";
+import { readBoundedResponseText } from "@/lib/creator-response";
 
 const quoteHashSchema = z.string().regex(/^0x[a-fA-F0-9]{64}$/);
 export const activationRequestSchema = z.discriminatedUnion("action", [
@@ -29,10 +30,10 @@ async function postJson(url: string, body: unknown) {
     signal: AbortSignal.timeout(12_000),
     cache: "no-store",
   });
-  const text = await response.text();
-  if (text.length > 100_000) throw new Error("Agent response exceeded 100 KB");
+  const read = await readBoundedResponseText(response, 100_000, "Agent response exceeded 100 KB");
+  if (!read.ok) throw new Error(read.error);
   let parsed: unknown;
-  try { parsed = JSON.parse(text); } catch { throw new Error("Agent returned invalid JSON"); }
+  try { parsed = JSON.parse(read.text); } catch { throw new Error("Agent returned invalid JSON"); }
   if (!response.ok) throw new Error(`Agent request failed (${response.status})`);
   return parsed;
 }

@@ -56,4 +56,29 @@ describe("BNB marketplace registry loader", () => {
     expect(loaded.endpointStatus).toBe("unavailable");
     expect(loaded.createdTxHash).toBeNull();
   });
+
+  it("fails closed and cancels an oversized streamed registry response", async () => {
+    const agent = BNB_MARKETPLACE_AGENTS[0];
+    const encoder = new TextEncoder();
+    const chunks = ["x".repeat(60_000), "y".repeat(40_001), "z".repeat(60_000)];
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const chunk = chunks.shift();
+        if (chunk === undefined) controller.close();
+        else controller.enqueue(encoder.encode(chunk));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(body, { status: 200, headers: { "content-length": "1" } }))
+      .mockResolvedValueOnce(jsonResponse({ name: agent.name, url: agent.sellerApiBaseUrl.replace("/api/seller", "/seller") }));
+
+    const loaded = await loadBnbMarketplaceAgent(agent);
+    expect(loaded.registryStatus).toBe("unavailable");
+    expect(loaded.endpointStatus).toBe("unavailable");
+    expect(cancelled).toBe(true);
+  });
 });
