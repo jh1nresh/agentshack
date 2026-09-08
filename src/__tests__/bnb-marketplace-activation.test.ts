@@ -1,246 +1,170 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { keccak256, toBytes } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { activationRequestSchema, dispatchTestnetActivation } from "@/lib/bnb-marketplace-activation";
 import { getMarketplaceActivationAction } from "@/lib/bnb-marketplace-activation-flow";
-import { BNB_MARKETPLACE_AGENTS } from "@/lib/bnb-marketplace";
+import * as marketplace from "@/lib/bnb-marketplace";
+import quotes from "./fixtures/bnb-seller-quotes.json";
 
 afterEach(() => vi.restoreAllMocks());
-
-const FUZZ_SEED = 0x8183_8004;
-const FUZZ_CASES = 128;
-
-function seededRandom(seed: number) {
-  let state = seed >>> 0;
+const agents = marketplace.BNB_MARKETPLACE_AGENTS;
+const seed = 0x81838004;
+const cases = 128;
+function randomGenerator() {
+  let state = seed;
   return () => {
-    state += 0x6d2b79f5;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state;
   };
 }
-
-function randomString(random: () => number, alphabet: string, length: number) {
-  return Array.from({ length }, () => alphabet[Math.floor(random() * alphabet.length)]).join("");
+function respond(body: unknown) {
+  return vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify(body)));
 }
-
-function randomPositiveBigInt(random: () => number, max: bigint) {
-  const high = BigInt(Math.floor(random() * 0x1_0000_0000));
-  const low = BigInt(Math.floor(random() * 0x1_0000_0000));
-  return ((high << 32n) | low) % max + 1n;
+function hashTerms(quote: typeof quotes[number]) {
+  const { quoteHash: _hash, signature: _sig, ...terms } = quote;
+  return keccak256(toBytes(JSON.stringify(Object.fromEntries(Object.keys(terms).sort().map((key) => [key, terms[key as keyof typeof terms]])))));
 }
 
 describe("BNB marketplace activation boundary", () => {
-  it("resumes delivery without funding a confirmed job again", () => {
-    expect(getMarketplaceActivationAction(false, null)).toBe("quote");
-    expect(getMarketplaceActivationAction(true, null)).toBe("fund");
-    expect(getMarketplaceActivationAction(true, "42")).toBe("notify");
-  });
-
-  it("accepts only the curated slug and never a caller supplied endpoint", async () => {
-    expect(activationRequestSchema.safeParse({ action: "quote", slug: "studio-desk-grid", endpoint: "https://evil.example" }).success).toBe(false);
-    await expect(dispatchTestnetActivation({ action: "quote", slug: "missing" })).rejects.toThrow("Unknown BSC Testnet agent");
-  });
-
-  it("proxies a quote only to the curated testnet seller and validates its wallet", async () => {
-    const agent = BNB_MARKETPLACE_AGENTS[1];
-    const quote = {
-      quoteHash: `0x${"a".repeat(64)}`,
-      feeAmount: "1200000000000000",
-      wallet: agent.agentWallet,
-    };
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify(quote), { status: 200 }),
-    );
-
+  it.each([0, 1, 2, 3])("verifies real seller v1 signed quote fixture %i without a wallet field", async (index) => {
+    const agent = agents[index];
+    const fetchMock = respond(quotes[index]);
     const result = await dispatchTestnetActivation({ action: "quote", slug: agent.slug });
-    expect(result.chainId).toBe(97);
-    expect(fetchMock).toHaveBeenCalledWith(`${agent.sellerApiBaseUrl}/quote`, expect.objectContaining({
-      method: "POST", redirect: "error", cache: "no-store",
+    expect(result.quote?.wallet).toBe(agent.agentWallet);
+    expect(result.quote?.feeAmount).toBe(quotes[index].feeAmount);
+    expect(fetchMock).toHaveBeenCalledWith(agent.sellerApiBaseUrl + "/quote", expect.objectContaining({
+      redirect: "error", cache: "no-store",
     }));
   });
 
-  it("rejects a signed quote from a wallet outside the registry identity", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
-      quoteHash: `0x${"b".repeat(64)}`,
-      feeAmount: "1",
-      wallet: "0x0000000000000000000000000000000000000001",
-    }), { status: 200 }));
-
-    await expect(dispatchTestnetActivation({ action: "quote", slug: BNB_MARKETPLACE_AGENTS[0].slug }))
-      .rejects.toThrow("Quote wallet does not match registry identity");
+  it("accepts reordered quote fields without changing the signed content", async () => {
+    respond(Object.fromEntries(Object.entries(quotes[0]).reverse()));
+    await expect(dispatchTestnetActivation({ action: "quote", slug: agents[0].slug })).resolves.toMatchObject({ chainId: 97 });
   });
 
-  it("rejects a quote above the curated testnet fee cap", async () => {
-    const agent = BNB_MARKETPLACE_AGENTS[0];
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
-      quoteHash: `0x${"d".repeat(64)}`,
-      feeAmount: (BigInt(agent.maxFeeAmount) + 1n).toString(),
-      wallet: agent.agentWallet,
-    }), { status: 200 }));
-
-    await expect(dispatchTestnetActivation({ action: "quote", slug: agent.slug }))
-      .rejects.toThrow("Quote exceeds the curated testnet fee cap");
-  });
-
-  it("rejects and cancels a streamed seller response above the byte limit", async () => {
-    const encoder = new TextEncoder();
-    const chunks = ["x".repeat(60_000), "y".repeat(40_001), "z".repeat(60_000)];
-    let cancelled = false;
-    const body = new ReadableStream<Uint8Array>({
-      pull(controller) {
-        const chunk = chunks.shift();
-        if (chunk === undefined) controller.close();
-        else controller.enqueue(encoder.encode(chunk));
-      },
-      cancel() {
-        cancelled = true;
-      },
-    });
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(body, { status: 200, headers: { "content-length": "1" } }),
-    );
-
-    await expect(dispatchTestnetActivation({ action: "quote", slug: BNB_MARKETPLACE_AGENTS[0].slug }))
-      .rejects.toThrow("Agent response exceeded 100 KB");
-    expect(cancelled).toBe(true);
-  });
-
-  it("notifies delivery only with a funded job id and quote hash", async () => {
-    const agent = BNB_MARKETPLACE_AGENTS[3];
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(JSON.stringify({ status: "accepted", receipt: { jobId: "42" } }), { status: 200 }),
-    );
-    const quoteHash = `0x${"c".repeat(64)}` as `0x${string}`;
-
-    await dispatchTestnetActivation({ action: "notify_funded", slug: agent.slug, jobId: "42", quoteHash });
-    expect(fetchMock).toHaveBeenCalledWith(`${agent.sellerApiBaseUrl}/notify_funded`, expect.objectContaining({
-      body: JSON.stringify({ jobId: "42", quoteHash, dryRun: false, amount: "1" }),
-    }));
-  });
-
-  it("property: rejects caller-controlled endpoint fields and unknown seller slugs", async () => {
-    const random = seededRandom(FUZZ_SEED);
+  it("rejects unknown agents and caller-controlled endpoints before fetching", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
-
-    for (let index = 0; index < FUZZ_CASES; index++) {
-      const host = randomString(random, "abcdefghijklmnopqrstuvwxyz0123456789", 12);
-      const endpoint = `https://${host}.example/api/${index}`;
-      const agent = BNB_MARKETPLACE_AGENTS[index % BNB_MARKETPLACE_AGENTS.length];
-      const payload = index % 2 === 0
-        ? { action: "quote", slug: agent.slug, endpoint }
-        : { action: "notify_funded", slug: agent.slug, jobId: String(index + 1), quoteHash: `0x${"a".repeat(64)}`, endpoint };
-
-      expect(
-        activationRequestSchema.safeParse(payload).success,
-        `seed=${FUZZ_SEED} case=${index} endpoint=${endpoint}`,
-      ).toBe(false);
-
-      const unknownSlug = `fuzz-${randomString(random, "abcdefghijklmnopqrstuvwxyz0123456789-", 24)}`;
-      await expect(dispatchTestnetActivation({ action: "quote", slug: unknownSlug }))
-        .rejects.toThrow("Unknown BSC Testnet agent");
+    const random = randomGenerator();
+    for (let index = 0; index < cases; index++) {
+      const request = index % 2 === 0
+        ? { action: "quote", slug: agents[index % 4].slug }
+        : { action: "notify_funded", slug: agents[index % 4].slug, jobId: "42", quoteHash: quotes[index % 4].quoteHash };
+      const payload = { ...request, endpoint: `https://attacker-${random()}.example` };
+      expect(activationRequestSchema.safeParse(payload).success, `seed=${seed} case=${index}`).toBe(false);
+      await expect(dispatchTestnetActivation({ action: "quote", slug: `missing-${random()}` })).rejects.toThrow("Unknown BSC Testnet agent");
     }
-
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("property: rejects malformed quote hashes and job identifiers", () => {
-    const random = seededRandom(FUZZ_SEED ^ 0x51a7);
-    const validSlug = BNB_MARKETPLACE_AGENTS[0].slug;
-
-    for (let index = 0; index < FUZZ_CASES; index++) {
-      const invalidHash = index % 3 === 0
-        ? `0x${randomString(random, "0123456789abcdef", 63)}`
-        : index % 3 === 1
-          ? `0x${randomString(random, "0123456789abcdef", 65)}`
-          : `0x${randomString(random, "ghijklmnopqrstuvwxyz", 64)}`;
-      const invalidJobId = index % 4 === 0
-        ? "0x1"
-        : index % 4 === 1
-          ? "-1"
-          : index % 4 === 2
-            ? "1e6"
-            : randomString(random, "0123456789", 79 + (index % 32));
-
-      expect(
-        activationRequestSchema.safeParse({ action: "notify_funded", slug: validSlug, jobId: "1", quoteHash: invalidHash }).success,
-        `seed=${FUZZ_SEED ^ 0x51a7} case=${index} hash=${invalidHash}`,
-      ).toBe(false);
-      expect(
-        activationRequestSchema.safeParse({ action: "notify_funded", slug: validSlug, jobId: invalidJobId, quoteHash: `0x${"b".repeat(64)}` }).success,
-        `seed=${FUZZ_SEED ^ 0x51a7} case=${index} jobId=${invalidJobId}`,
-      ).toBe(false);
+  it("property: rejects malformed hashes and job identifiers", () => {
+    const random = randomGenerator();
+    for (let index = 0; index < cases; index++) {
+      const quoteHash = ["0x" + "a".repeat(63), "0x" + "a".repeat(65), "0x" + "g".repeat(64)][index % 3];
+      const jobId = ["0x1", "-" + random(), "1e6", "9".repeat(79 + index)][index % 4];
+      const valid = { action: "notify_funded", slug: agents[0].slug, jobId: "42", quoteHash: quotes[0].quoteHash };
+      expect(activationRequestSchema.safeParse({ ...valid, quoteHash }).success).toBe(false);
+      expect(activationRequestSchema.safeParse({ ...valid, jobId }).success).toBe(false);
     }
   });
 
-  it("property: accepts positive fees at or below each curated cap", async () => {
-    const random = seededRandom(FUZZ_SEED ^ 0xfee);
+  it.each([
+    { chainId: 56 }, { agentId: 1881 }, { typedSelector: "swapAnything" },
+    { commerce: "0x0000000000000000000000000000000000000001" },
+    { policy: "0x0000000000000000000000000000000000000001" },
+    { feeToken: "0x0000000000000000000000000000000000000001" },
+  ])("rejects changed chain, identity or payment targets: %j", async (change) => {
+    respond({ ...quotes[0], ...change });
+    await expect(dispatchTestnetActivation({ action: "quote", slug: agents[0].slug })).rejects.toThrow();
+  });
+
+  it("rejects modified terms even when the original signature is retained", async () => {
+    respond({ ...quotes[0], terms: "Different terms" });
+    await expect(dispatchTestnetActivation({ action: "quote", slug: agents[0].slug })).rejects.toThrow("Quote hash does not match its terms");
+  });
+
+  it("rejects recomputed terms signed by a different agent", async () => {
+    const forged = { ...quotes[0], feeAmount: "1", signature: quotes[1].signature };
+    forged.quoteHash = hashTerms(forged);
+    respond(forged);
+    await expect(dispatchTestnetActivation({ action: "quote", slug: agents[0].slug })).rejects.toThrow("Quote signature does not match registry identity");
+  });
+
+  it("rejects unsigned legacy wallet claims", async () => {
+    respond({ quoteHash: quotes[0].quoteHash, feeAmount: "1", wallet: agents[0].agentWallet });
+    await expect(dispatchTestnetActivation({ action: "quote", slug: agents[0].slug })).rejects.toThrow();
+  });
+
+  it("property: validates positive under-cap fees with real test signatures", async () => {
+    // Public deterministic test key, never funded or used outside these unit tests.
+    const signer = privateKeyToAccount("0x" + "1".repeat(64) as `0x${string}`);
+    vi.spyOn(marketplace, "getBnbMarketplaceAgent").mockImplementation((slug) => {
+      const agent = agents.find((item) => item.slug === slug);
+      return agent ? { ...agent, agentWallet: signer.address } : undefined;
+    });
+    const random = randomGenerator();
     const fetchMock = vi.spyOn(globalThis, "fetch");
-
-    for (let index = 0; index < FUZZ_CASES; index++) {
-      const agent = BNB_MARKETPLACE_AGENTS[index % BNB_MARKETPLACE_AGENTS.length];
-      const feeAmount = randomPositiveBigInt(random, BigInt(agent.maxFeeAmount)).toString();
-      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
-        quoteHash: `0x${"c".repeat(64)}`,
-        feeAmount,
-        wallet: agent.agentWallet,
-      }), { status: 200 }));
-
+    for (let index = 0; index < cases; index++) {
+      const agent = agents[index % 4];
+      const amount = ((BigInt(random()) << 32n) | BigInt(random())) % BigInt(agent.maxFeeAmount) + 1n;
+      const quote = { ...quotes[index % 4], feeAmount: amount.toString() };
+      if (index < 4) quote.feeAmount = agent.maxFeeAmount;
+      quote.quoteHash = hashTerms(quote);
+      quote.signature = await signer.signMessage({ message: { raw: quote.quoteHash as `0x${string}` } });
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(quote)));
       const result = await dispatchTestnetActivation({ action: "quote", slug: agent.slug });
-      expect(result.quote?.feeAmount, `seed=${FUZZ_SEED ^ 0xfee} case=${index}`).toBe(feeAmount);
+      expect(result.quote?.feeAmount, `seed=${seed} case=${index}`).toBe(quote.feeAmount);
     }
   });
 
-  it("property: rejects over-cap and oversized fee strings", async () => {
-    const random = seededRandom(FUZZ_SEED ^ 0xbadfee);
+  it("property: rejects zero, over-cap and oversized fees", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
-
-    for (let index = 0; index < FUZZ_CASES; index++) {
-      const agent = BNB_MARKETPLACE_AGENTS[index % BNB_MARKETPLACE_AGENTS.length];
-      const feeAmount = index % 2 === 0
-        ? (BigInt(agent.maxFeeAmount) + 1n + BigInt(index)).toString()
-        : randomString(random, "123456789", 79 + (index % 82));
-      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
-        quoteHash: `0x${"d".repeat(64)}`,
-        feeAmount,
-        wallet: agent.agentWallet,
-      }), { status: 200 }));
-
-      await expect(dispatchTestnetActivation({ action: "quote", slug: agent.slug }))
-        .rejects.toThrow();
+    for (let index = 0; index < cases; index++) {
+      const agent = agents[index % 4];
+      const feeAmount = index % 3 === 0 ? "0" : index % 3 === 1
+        ? (BigInt(agent.maxFeeAmount) + 1n + BigInt(index)).toString() : "9".repeat(79 + index);
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ...quotes[index % 4], feeAmount })));
+      await expect(dispatchTestnetActivation({ action: "quote", slug: agent.slug })).rejects.toThrow();
     }
   });
 
-  it("property: rejects malformed quote hashes returned by a seller", async () => {
-    const random = seededRandom(FUZZ_SEED ^ 0x4a5a);
+  it("property: rejects malformed seller hashes", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
-
-    for (let index = 0; index < FUZZ_CASES; index++) {
-      const agent = BNB_MARKETPLACE_AGENTS[index % BNB_MARKETPLACE_AGENTS.length];
-      const quoteHash = index % 3 === 0
-        ? `0x${randomString(random, "0123456789abcdef", 63)}`
-        : index % 3 === 1
-          ? `0x${randomString(random, "0123456789abcdef", 65)}`
-          : randomString(random, "0123456789abcdef", 64);
-      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({
-        quoteHash,
-        feeAmount: "1",
-        wallet: agent.agentWallet,
-      }), { status: 200 }));
-
-      await expect(dispatchTestnetActivation({ action: "quote", slug: agent.slug }))
-        .rejects.toThrow();
+    for (let index = 0; index < cases; index++) {
+      fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ...quotes[0], quoteHash: "0x" + "a".repeat(65 + index) })));
+      await expect(dispatchTestnetActivation({ action: "quote", slug: agents[0].slug })).rejects.toThrow();
     }
   });
 
-  it("property: every funded job resumes at delivery instead of funding", () => {
-    const random = seededRandom(FUZZ_SEED ^ 0xf00d);
+  it("cancels oversized seller streams", async () => {
+    const cancel = vi.fn();
+    const chunks = [new Uint8Array(60_000), new Uint8Array(40_001), new Uint8Array(60_000)];
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const chunk = chunks.shift();
+        if (chunk) controller.enqueue(chunk);
+        else controller.close();
+      },
+      cancel,
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(body, { headers: { "content-length": "1" } }));
+    await expect(dispatchTestnetActivation({ action: "quote", slug: agents[0].slug })).rejects.toThrow("Agent response exceeded 100 KB");
+    expect(cancel).toHaveBeenCalledOnce();
+  });
 
-    for (let index = 0; index < FUZZ_CASES; index++) {
-      const jobId = randomPositiveBigInt(random, 2n ** 255n).toString();
-      expect(
-        getMarketplaceActivationAction(true, jobId),
-        `seed=${FUZZ_SEED ^ 0xf00d} case=${index} jobId=${jobId}`,
-      ).toBe("notify");
+  it("forwards a delivery notification without asserting seller-side settlement", async () => {
+    const fetchMock = respond({ status: "accepted", receipt: { jobId: "42" } });
+    await dispatchTestnetActivation({ action: "notify_funded", slug: agents[0].slug, jobId: "42", quoteHash: quotes[0].quoteHash });
+    expect(fetchMock).toHaveBeenCalledWith(agents[0].sellerApiBaseUrl + "/notify_funded", expect.objectContaining({
+      body: JSON.stringify({ jobId: "42", quoteHash: quotes[0].quoteHash, dryRun: false, amount: "1" }),
+    }));
+  });
+
+  it("property: retries confirmed funded jobs at delivery without funding again", () => {
+    expect(getMarketplaceActivationAction(false, null)).toBe("quote");
+    expect(getMarketplaceActivationAction(true, null)).toBe("fund");
+    const random = randomGenerator();
+    for (let index = 0; index < cases; index++) {
+      expect(getMarketplaceActivationAction(true, String(random()))).toBe("notify");
     }
   });
 });

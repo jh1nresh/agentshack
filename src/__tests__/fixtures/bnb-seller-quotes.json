@@ -1,0 +1,58 @@
+[
+  {
+    "version": 1,
+    "chainId": 97,
+    "commerce": "0xa206c0517B6371C6638CD9e4a42Cc9f02A33B0DE",
+    "policy": "0xd6a4217588f6b1f5657a92a3e94e6422ad771cea",
+    "agentId": 1880,
+    "category": "rebalancing",
+    "feeToken": "0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565",
+    "feeAmount": "1000000000000000",
+    "terms": "fixed fee; evidence-backed Pancake V3 position management",
+    "typedSelector": "rebalancePancakeV3",
+    "quoteHash": "0xaa6c24cfcd7d67722ed883c714bad351eab6780a22ecba208a5fbf0c1d2a1df5",
+    "signature": "0xf6d3a1720d150e77910af886812481faed73587c67de7a583d73480eb51379a26bf28af5fcad6b5b933680dbf19d37d0cf7871176e981c1b4905eaf123caaff71b"
+  },
+  {
+    "version": 1,
+    "chainId": 97,
+    "commerce": "0xa206c0517B6371C6638CD9e4a42Cc9f02A33B0DE",
+    "policy": "0xd6a4217588f6b1f5657a92a3e94e6422ad771cea",
+    "agentId": 1881,
+    "category": "grid",
+    "feeToken": "0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565",
+    "feeAmount": "1200000000000000",
+    "terms": "fixed fee; one bounded grid step per funded job",
+    "typedSelector": "gridStep",
+    "quoteHash": "0x5b158b921a436c35d8086bf3adcf32f679eed71bf7f51887be250e9fd85cafcd",
+    "signature": "0x812c00dcf86c7d1f1a2105efbb011c8ba5ba916e8e145be0d0c0709d3be7b20f215508300d1d7b08114f215b1768d6f66ab319642b3f03de0b34044c18b5c12a1b"
+  },
+  {
+    "version": 1,
+    "chainId": 97,
+    "commerce": "0xa206c0517B6371C6638CD9e4a42Cc9f02A33B0DE",
+    "policy": "0xd6a4217588f6b1f5657a92a3e94e6422ad771cea",
+    "agentId": 1882,
+    "category": "bounded yield allocation",
+    "feeToken": "0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565",
+    "feeAmount": "900000000000000",
+    "terms": "fixed fee; bounded deposit or withdraw at one verified venue",
+    "typedSelector": "allocateYield",
+    "quoteHash": "0x15127f2786b7fb24064759dbe0bb4197ef2de7c94804977000d02e68171693fc",
+    "signature": "0x33f738e38f30601a2c1ffdb8b6dee10454e619f08edfafd5c785aa978f89e06412ba383f0b2ab26678b9beae754350cf0a4b8f1caae5b1833128176c8e887eba1c"
+  },
+  {
+    "version": 1,
+    "chainId": 97,
+    "commerce": "0xa206c0517B6371C6638CD9e4a42Cc9f02A33B0DE",
+    "policy": "0xd6a4217588f6b1f5657a92a3e94e6422ad771cea",
+    "agentId": 1883,
+    "category": "risk",
+    "feeToken": "0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565",
+    "feeAmount": "1100000000000000",
+    "terms": "fixed fee; Venus liquidity/shortfall protection",
+    "typedSelector": "protectRepayVenus",
+    "quoteHash": "0x8d6cafc2a87789ce66a84b478a706c030bea75993ed4e194905ce11bfc5f9f69",
+    "signature": "0x1fe67ee8b86e89164be3b0bb40278f5238ef4964a8c5151f319210225d6a4da67ebf6b84a18c2c27be92ac53211838eacb84ac408a3897f8e53bf52714758c371b"
+  }
+]
