@@ -1,50 +1,57 @@
 import { z } from "zod";
+import { createPublicClient, http, parseAbi } from "viem";
 import { BNB_MARKETPLACE_AGENTS, type BnbMarketplaceAgent } from "@/lib/bnb-marketplace";
+import { BNB_MARKETPLACE_CHAIN } from "@/lib/bnb-marketplace-chain";
 import { readBoundedResponseText } from "@/lib/creator-response";
 
-const addressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/);
-const hashSchema = z.string().regex(/^0x[a-fA-F0-9]{64}$/);
-const registryResponseSchema = z.object({
-  success: z.literal(true),
-  data: z.object({
-    name: z.string().min(1), token_id: z.string(), chain_id: z.number(), contract_address: addressSchema,
-    agent_wallet: addressSchema, description: z.string().min(1), created_tx_hash: hashSchema, updated_at: z.string().nullable(),
-  }),
+const registryAbi = parseAbi([
+  "function getAgentWallet(uint256 agentId) view returns(address)",
+  "function tokenURI(uint256 agentId) view returns(string)",
+]);
+const client = createPublicClient({
+  chain: BNB_MARKETPLACE_CHAIN,
+  transport: http(undefined, { timeout: 8_000, retryCount: 0 }),
+});
+const metadataSchema = z.object({
+  name: z.string().min(1), description: z.string().min(1), chainId: z.literal(97),
+  identityRegistry: z.string(),
+  endpoints: z.array(z.object({ name: z.string(), endpoint: z.string().url() })),
 });
 const agentCardSchema = z.object({ name: z.string().min(1), url: z.string().url() });
 
-function sameAddress(a: string, b: string) {
-  return a.toLowerCase() === b.toLowerCase();
-}
-
-async function checkedJson(url: string, init?: RequestInit) {
-  const response = await fetch(url, { ...init, redirect: "error", signal: AbortSignal.timeout(8_000), next: { revalidate: 60 } });
-  if (!response.ok) throw new Error(`Upstream returned ${response.status}`);
-  const read = await readBoundedResponseText(response, 100_000, "Upstream response too large");
-  if (!read.ok) throw new Error(read.error);
-  return JSON.parse(read.text) as unknown;
-}
-
 export async function loadBnbMarketplaceAgent(agent: BnbMarketplaceAgent): Promise<BnbMarketplaceAgent> {
   try {
-    const headers: HeadersInit = {};
-    const apiKey = process.env.API_8004SCAN_KEY?.trim();
-    if (apiKey) headers["X-API-Key"] = apiKey;
-    const [registryRaw, cardRaw] = await Promise.all([
-      checkedJson(`https://8004scan.io/api/v1/public/agents/${agent.chainId}/${agent.agentId}`, { headers }),
-      checkedJson(agent.agentCardUrl),
+    const [chainId, wallet, uri] = await Promise.all([
+      client.getChainId(),
+      client.readContract({ address: agent.registryAddress, abi: registryAbi, functionName: "getAgentWallet", args: [BigInt(agent.agentId)] }),
+      client.readContract({ address: agent.registryAddress, abi: registryAbi, functionName: "tokenURI", args: [BigInt(agent.agentId)] }),
     ]);
-    const registry = registryResponseSchema.parse(registryRaw).data;
-    const card = agentCardSchema.parse(cardRaw);
+    if (chainId !== agent.chainId || wallet.toLowerCase() !== agent.agentWallet.toLowerCase()) {
+      throw new Error("Registry identity mismatch");
+    }
+    // These curated identities use onchain data URIs. Never fetch arbitrary tokenURI URLs.
+    const prefix = "data:application/json;base64,";
+    if (!uri.startsWith(prefix) || uri.length > 100_000) throw new Error("Unsupported registry metadata");
+    const metadata = metadataSchema.parse(JSON.parse(Buffer.from(uri.slice(prefix.length), "base64").toString("utf8")));
+    const sellerUrl = agent.agentCardUrl.replace("/.well-known/agent-card.json", "");
     if (
-      registry.chain_id !== agent.chainId || registry.token_id !== String(agent.agentId) ||
-      !sameAddress(registry.contract_address, agent.registryAddress) || !sameAddress(registry.agent_wallet, agent.agentWallet) ||
-      card.name !== agent.name || new URL(card.url).origin !== new URL(agent.agentCardUrl).origin
-    ) throw new Error("Registry identity mismatch");
+      metadata.name !== agent.name || metadata.identityRegistry.toLowerCase() !== agent.registryAddress.toLowerCase() ||
+      !metadata.endpoints.some((endpoint) => endpoint.name === "A2A" && endpoint.endpoint === agent.agentCardUrl) ||
+      !metadata.endpoints.some((endpoint) => endpoint.name === "HTTP" && endpoint.endpoint === sellerUrl)
+    ) throw new Error("Registry endpoint mismatch");
+
+    const response = await fetch(agent.agentCardUrl, {
+      redirect: "error", signal: AbortSignal.timeout(8_000), cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`Upstream returned ${response.status}`);
+    const read = await readBoundedResponseText(response, 100_000, "Upstream response too large");
+    if (!read.ok) throw new Error(read.error);
+    const card = agentCardSchema.parse(JSON.parse(read.text));
+    if (card.name !== agent.name || card.url !== sellerUrl) throw new Error("Agent card mismatch");
 
     return {
-      ...agent, name: registry.name, summary: registry.description, registryStatus: "live", endpointStatus: "live",
-      registryUpdatedAt: registry.updated_at, createdTxHash: registry.created_tx_hash as `0x${string}`,
+      ...agent, summary: metadata.description, registryStatus: "live", endpointStatus: "live",
+      registryUpdatedAt: null, createdTxHash: null,
     };
   } catch {
     return { ...agent, registryStatus: "unavailable", endpointStatus: "unavailable", registryUpdatedAt: null, createdTxHash: null };

@@ -1,84 +1,123 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BNB_MARKETPLACE_AGENTS } from "@/lib/bnb-marketplace";
 import { loadBnbMarketplaceAgent } from "@/lib/bnb-marketplace-registry";
 
+const rpc = vi.hoisted(() => ({ getChainId: vi.fn(), readContract: vi.fn() }));
+vi.mock("viem", async (importOriginal) => ({
+  ...await importOriginal<typeof import("viem")>(),
+  createPublicClient: () => rpc,
+}));
 afterEach(() => vi.restoreAllMocks());
 
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+const agent = BNB_MARKETPLACE_AGENTS[0];
+const sellerUrl = agent.agentCardUrl.replace("/.well-known/agent-card.json", "");
+function metadata(overrides: Record<string, unknown> = {}) {
+  return {
+    name: agent.name, description: "Onchain registry description", chainId: 97,
+    identityRegistry: agent.registryAddress,
+    endpoints: [
+      { name: "HTTP", endpoint: sellerUrl },
+      { name: "A2A", endpoint: agent.agentCardUrl },
+    ],
+    ...overrides,
+  };
+}
+function dataUri(body: unknown) {
+  return "data:application/json;base64," + Buffer.from(JSON.stringify(body)).toString("base64");
+}
+function mockIdentity(uri = dataUri(metadata()), wallet = agent.agentWallet) {
+  rpc.readContract.mockImplementation(async ({ functionName }: { functionName: string }) =>
+    functionName === "getAgentWallet" ? wallet : uri);
+}
+beforeEach(() => {
+  rpc.getChainId.mockReset().mockResolvedValue(97);
+  rpc.readContract.mockReset();
+  mockIdentity();
+});
+function cardResponse(body: unknown = { name: agent.name, url: sellerUrl }) {
+  return new Response(JSON.stringify(body), { status: 200 });
 }
 
 describe("BNB marketplace registry loader", () => {
-  it("marks an exact registry identity and agent card live", async () => {
-    const agent = BNB_MARKETPLACE_AGENTS[0];
-    vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(jsonResponse({
-        success: true,
-        data: {
-          name: agent.name,
-          token_id: String(agent.agentId),
-          chain_id: 97,
-          contract_address: agent.registryAddress,
-          agent_wallet: agent.agentWallet,
-          description: "Live registry description",
-          created_tx_hash: `0x${"1".repeat(64)}`,
-          updated_at: "2026-08-23T00:00:00Z",
-        },
-      }))
-      .mockResolvedValueOnce(jsonResponse({ name: agent.name, url: agent.sellerApiBaseUrl.replace("/api/seller", "/seller") }));
-
+  it("verifies the onchain wallet and exact endpoints without an indexer", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(cardResponse());
     const loaded = await loadBnbMarketplaceAgent(agent);
     expect(loaded.registryStatus).toBe("live");
     expect(loaded.endpointStatus).toBe("live");
-    expect(loaded.summary).toBe("Live registry description");
-  });
-
-  it("fails closed when the registry wallet does not match", async () => {
-    const agent = BNB_MARKETPLACE_AGENTS[0];
-    vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(jsonResponse({
-        success: true,
-        data: {
-          name: agent.name,
-          token_id: String(agent.agentId),
-          chain_id: 97,
-          contract_address: agent.registryAddress,
-          agent_wallet: "0x0000000000000000000000000000000000000001",
-          description: agent.summary,
-          created_tx_hash: `0x${"2".repeat(64)}`,
-          updated_at: null,
-        },
-      }))
-      .mockResolvedValueOnce(jsonResponse({ name: agent.name, url: agent.sellerApiBaseUrl.replace("/api/seller", "/seller") }));
-
-    const loaded = await loadBnbMarketplaceAgent(agent);
-    expect(loaded.registryStatus).toBe("unavailable");
-    expect(loaded.endpointStatus).toBe("unavailable");
+    expect(loaded.summary).toBe("Onchain registry description");
     expect(loaded.createdTxHash).toBeNull();
+    expect(loaded.registryUpdatedAt).toBeNull();
+    expect(rpc.readContract).toHaveBeenCalledWith(expect.objectContaining({
+      address: agent.registryAddress, functionName: "getAgentWallet", args: [1880n],
+    }));
+    expect(fetchMock).toHaveBeenCalledExactlyOnceWith(agent.agentCardUrl, expect.objectContaining({
+      redirect: "error", cache: "no-store",
+    }));
   });
 
-  it("fails closed and cancels an oversized streamed registry response", async () => {
-    const agent = BNB_MARKETPLACE_AGENTS[0];
-    const encoder = new TextEncoder();
-    const chunks = ["x".repeat(60_000), "y".repeat(40_001), "z".repeat(60_000)];
-    let cancelled = false;
+  it("rejects a wallet mismatch before contacting the seller", async () => {
+    mockIdentity(dataUri(metadata()), "0x0000000000000000000000000000000000000001");
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    expect((await loadBnbMarketplaceAgent(agent)).registryStatus).toBe("unavailable");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a wrong RPC chain and fails closed on RPC errors", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    rpc.getChainId.mockResolvedValueOnce(56);
+    expect((await loadBnbMarketplaceAgent(agent)).registryStatus).toBe("unavailable");
+    rpc.readContract.mockRejectedValueOnce(new Error("RPC unavailable"));
+    expect((await loadBnbMarketplaceAgent(agent)).registryStatus).toBe("unavailable");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { chainId: 56 },
+    { name: "Different agent" },
+    { identityRegistry: "0x0000000000000000000000000000000000000001" },
+    { endpoints: [{ name: "A2A", endpoint: "https://evil.example/card.json" }] },
+    { endpoints: [{ name: "A2A", endpoint: agent.agentCardUrl }, { name: "HTTP", endpoint: sellerUrl + "1" }] },
+  ])("rejects changed onchain identity metadata: %j", async (overrides) => {
+    mockIdentity(dataUri(metadata(overrides)));
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    expect((await loadBnbMarketplaceAgent(agent)).registryStatus).toBe("unavailable");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["https://evil.example/metadata", "data:application/json;base64,e30=", "data:application/json;base64," + "a".repeat(100_000)])(
+    "rejects unsupported, malformed or oversized tokenURI without fetching it",
+    async (uri) => {
+      mockIdentity(uri);
+      const fetchMock = vi.spyOn(globalThis, "fetch");
+      expect((await loadBnbMarketplaceAgent(agent)).registryStatus).toBe("unavailable");
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { name: "Different agent", url: sellerUrl },
+    { name: agent.name, url: sellerUrl + "1" },
+    { name: agent.name, url: "https://evil.example/seller/1880" },
+  ])("rejects card identity/path changes: %j", async (card) => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(cardResponse(card));
+    expect((await loadBnbMarketplaceAgent(agent)).endpointStatus).toBe("unavailable");
+  });
+
+  it("cancels an oversized streamed card even with a misleading content length", async () => {
+    const cancel = vi.fn();
+    const chunks = [new Uint8Array(60_000), new Uint8Array(40_001), new Uint8Array(60_000)];
     const body = new ReadableStream<Uint8Array>({
       pull(controller) {
         const chunk = chunks.shift();
-        if (chunk === undefined) controller.close();
-        else controller.enqueue(encoder.encode(chunk));
+        if (chunk) controller.enqueue(chunk);
+        else controller.close();
       },
-      cancel() {
-        cancelled = true;
-      },
+      cancel,
     });
-    vi.spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response(body, { status: 200, headers: { "content-length": "1" } }))
-      .mockResolvedValueOnce(jsonResponse({ name: agent.name, url: agent.sellerApiBaseUrl.replace("/api/seller", "/seller") }));
-
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(body, { headers: { "content-length": "1" } }));
     const loaded = await loadBnbMarketplaceAgent(agent);
     expect(loaded.registryStatus).toBe("unavailable");
     expect(loaded.endpointStatus).toBe("unavailable");
-    expect(cancelled).toBe(true);
+    expect(cancel).toHaveBeenCalledOnce();
   });
 });

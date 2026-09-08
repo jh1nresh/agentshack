@@ -38,7 +38,7 @@ describe("BNB agent marketplace", () => {
   it("does not include a mainnet or caller-controlled activation target", () => {
     for (const agent of BNB_MARKETPLACE_AGENTS) {
       expect(agent.chainId).toBe(97);
-      expect(agent.sellerApiBaseUrl).toMatch(/^https:\/\/13\.53\.65\.58\.sslip\.io\/api\/seller\/\d+$/);
+      expect(agent.sellerApiBaseUrl).toMatch(/^https:\/\/desk\.rouma\.online\/api\/seller\/\d+$/);
       expect(agent.registryStatus).toBe("checking");
     }
   });

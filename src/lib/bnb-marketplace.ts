@@ -47,8 +47,8 @@ export const BNB_MARKETPLACE_AGENTS: readonly BnbMarketplaceAgent[] = [
     controls: ["Read the current pool tick", "Read the selected position", "Return typed rebalance bounds"],
     chainId: BNB_TESTNET_CHAIN_ID, agentId: 1880, registryAddress: BNB_TESTNET_REGISTRY,
     agentWallet: "0x76849Ba8246Ea53FB417c295028c2AA9C6af7eD7",
-    agentCardUrl: "https://13.53.65.58.sslip.io/seller/1880/.well-known/agent-card.json",
-    sellerApiBaseUrl: "https://13.53.65.58.sslip.io/api/seller/1880", selector: "rebalancePancakeV3", feeLabel: "0.001 $U", maxFeeAmount: "1000000000000000",
+    agentCardUrl: "https://desk.rouma.online/seller/1880/.well-known/agent-card.json",
+    sellerApiBaseUrl: "https://desk.rouma.online/api/seller/1880", selector: "rebalancePancakeV3", feeLabel: "0.001 $U", maxFeeAmount: "1000000000000000",
     registryStatus: "checking", endpointStatus: "checking", registryUpdatedAt: null, createdTxHash: null,
   },
   {
@@ -58,8 +58,8 @@ export const BNB_MARKETPLACE_AGENTS: readonly BnbMarketplaceAgent[] = [
     controls: ["Use the fixed USDT/WBNB pair", "Respect the inventory ceiling", "Enforce cooldown and minimum output"],
     chainId: BNB_TESTNET_CHAIN_ID, agentId: 1881, registryAddress: BNB_TESTNET_REGISTRY,
     agentWallet: "0x2eD7Dc63681D912948C215DCdE4c4FCe9A3F19F8",
-    agentCardUrl: "https://13.53.65.58.sslip.io/seller/1881/.well-known/agent-card.json",
-    sellerApiBaseUrl: "https://13.53.65.58.sslip.io/api/seller/1881", selector: "gridStep", feeLabel: "0.0012 $U", maxFeeAmount: "1200000000000000",
+    agentCardUrl: "https://desk.rouma.online/seller/1881/.well-known/agent-card.json",
+    sellerApiBaseUrl: "https://desk.rouma.online/api/seller/1881", selector: "gridStep", feeLabel: "0.0012 $U", maxFeeAmount: "1200000000000000",
     registryStatus: "checking", endpointStatus: "checking", registryUpdatedAt: null, createdTxHash: null,
   },
   {
@@ -69,8 +69,8 @@ export const BNB_MARKETPLACE_AGENTS: readonly BnbMarketplaceAgent[] = [
     controls: ["Use one verified Venus venue", "Bound the deposit amount", "Bound the withdrawal amount"],
     chainId: BNB_TESTNET_CHAIN_ID, agentId: 1882, registryAddress: BNB_TESTNET_REGISTRY,
     agentWallet: "0x1D7118d1A4A87411FB275046Cb156eCe8e7BD190",
-    agentCardUrl: "https://13.53.65.58.sslip.io/seller/1882/.well-known/agent-card.json",
-    sellerApiBaseUrl: "https://13.53.65.58.sslip.io/api/seller/1882", selector: "allocateYield", feeLabel: "0.0009 $U", maxFeeAmount: "900000000000000",
+    agentCardUrl: "https://desk.rouma.online/seller/1882/.well-known/agent-card.json",
+    sellerApiBaseUrl: "https://desk.rouma.online/api/seller/1882", selector: "allocateYield", feeLabel: "0.0009 $U", maxFeeAmount: "900000000000000",
     registryStatus: "checking", endpointStatus: "checking", registryUpdatedAt: null, createdTxHash: null,
   },
   {
@@ -80,8 +80,8 @@ export const BNB_MARKETPLACE_AGENTS: readonly BnbMarketplaceAgent[] = [
     controls: ["Read account liquidity", "Read account shortfall", "Bound repayBorrowBehalf"],
     chainId: BNB_TESTNET_CHAIN_ID, agentId: 1883, registryAddress: BNB_TESTNET_REGISTRY,
     agentWallet: "0x185BF63291A90eaf9D1b119Cc2c4b70df058BBa0",
-    agentCardUrl: "https://13.53.65.58.sslip.io/seller/1883/.well-known/agent-card.json",
-    sellerApiBaseUrl: "https://13.53.65.58.sslip.io/api/seller/1883", selector: "protectRepayVenus", feeLabel: "0.0011 $U", maxFeeAmount: "1100000000000000",
+    agentCardUrl: "https://desk.rouma.online/seller/1883/.well-known/agent-card.json",
+    sellerApiBaseUrl: "https://desk.rouma.online/api/seller/1883", selector: "protectRepayVenus", feeLabel: "0.0011 $U", maxFeeAmount: "1100000000000000",
     registryStatus: "checking", endpointStatus: "checking", registryUpdatedAt: null, createdTxHash: null,
   },
 ] as const;

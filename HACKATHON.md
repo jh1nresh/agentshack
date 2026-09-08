@@ -1,119 +1,78 @@
-# Maiat Dojo — BNB Hackathon Submission
+# AgentShack — The Smart Money Era
 
-> **Tokenized Agent Commerce + Reputation-Gated Allocation on BNB Chain.**
-> Chain: BSC Testnet (chain 97), Mainnet ready.
-> Target: Long-term Resource-Based Economy (RBE) for AI agents.
+A BSC Testnet marketplace for discovering, inspecting and hiring curated BNB Agent Studio agents across all four main-track categories.
 
----
+- Track: Main Track — Build the BNB Agent Studio Marketplace.
+- Repository: https://github.com/jh1nresh/agentshack
+- Public marketplace: https://www.agentshack.io/market
+- Homepage: https://www.agentshack.io
+- Network: BSC Testnet, chain ID 97. No mainnet hiring is offered.
+- Rules: https://www.bnbchain.org/en/hackathons/smart-money-era
+- Registration: https://forms.gle/9g9XPNFwnYaHAz9L8
+- Official form build deadline: September 9, 2026, 12:00 UTC (20:00 Taiwan).
+- Judging: September 9–23, 2026.
 
-## One-liner
+## Four categories, with explicit service limits
 
-**Agents buy skills like ERC-20 tokens, gated by reputation not just money.**
-Every `swap()` checks reputation before transferring USDC. Day-1 floors are 0,
-but the gate exists so reputation can gradually replace money as the primary
-resource allocation mechanism — the RBE seed.
+| Category | Agent / ERC-8004 ID | Available service | Limitation |
+| --- | --- | --- | --- |
+| Rebalancing | Studio Desk Rebalancer / 1880 | Reads PancakeSwap V3 pool and position data; returns a bounded rebalance proposal | No best-range, fee-return or continuous management guarantee |
+| Grid Trading | Studio Desk Grid / 1881 | One bounded step on a fixed Pancake pair, with inventory and minimum-output limits | No profitability guarantee or claim of a measured trading track record |
+| Yield Optimisation | Studio Desk Bounded Yield / 1882 | Bounded deposit/withdrawal at one verified Venus venue | Not a highest-APR search or cross-venue optimiser |
+| Health Factor Monitoring | Studio Desk Risk Protection / 1883 | Venus liquidity/shortfall reads and a bounded repayment proposal | Liquidity/shortfall is not presented as a computed health-factor metric |
 
----
+The marketplace lists third-party Studio Desk services. The descriptions above do not claim that AgentShack built those agents, that an agent card proves execution, or that receiving a proposal proves a DeFi transaction occurred.
 
-## What's on-chain (BSC Testnet — chain 97)
+## User journey
 
-| Contract | Address |
-|---|---|
-| SkillRegistry | [`0x104579420Ab86579631E8452EE553A75Fc257690`](https://testnet.bscscan.com/address/0x104579420Ab86579631E8452EE553A75Fc257690) |
-| SwapRouter | [`0x2844515814b44Ab23d5001571e2E1C726295536a`](https://testnet.bscscan.com/address/0x2844515814b44Ab23d5001571e2E1C726295536a) |
-| ReputationHub | [`0x6c6b8b4a72A291d95eC461FEc29cd764bbfcC159`](https://testnet.bscscan.com/address/0x6c6b8b4a72A291d95eC461FEc29cd764bbfcC159) |
-| USDC (test) | [`0x2F808cc071D7B54d23a7647d79d7EF6E2C830d31`](https://testnet.bscscan.com/address/0x2F808cc071D7B54d23a7647d79d7EF6E2C830d31) |
+1. Open the homepage and select one of the four categories.
+2. Search/select an agent, inspect its service, fee and limitations.
+3. Open its setup page and connect a BSC Testnet wallet.
+4. Request a signed quote. The server checks its canonical hash, signer, chain, agent, commerce contract, policy, fee token, selector and fee cap.
+5. Approve the five wallet transactions: create job, register policy, set budget, approve exact fee, fund.
+6. Request delivery. Retrying after confirmed funding only repeats the delivery notification in the current page session.
+7. Inspect the seller response and transaction links. Record delivery and actual execution evidence separately.
 
-### Demo skills registered
+The wallet needs testnet BNB for gas and the seller's quoted test $U token. The four currently listed fees total 0.0042 test $U, excluding gas. The app does not acquire tokens or send a private key to a server.
 
-| Slug | skillId | RUN_TOKEN |
-|---|---|---|
-| echo-test | `0x8ba5917d62055f9100acf59259c285ec2d0825d3fb72d3dc7dc0ac9a564b6f91` | `0x05E472c503E3e0651723E9A1638BD54E9873a426` |
-| web-scraper | `0x155a797494737fd1f2521b7378a906951020479d96261ff2a1b89c996936d255` | `0x689b4183b76aA2518E39f0C2ce9BF849F5f6E4c2` |
-| price-oracle | `0xe84a466f61fd3ef7b48426e340721de4a6859b63f9d22100f241f38815209150` | `0x3BB93aADA4e149FeCa5c1e2390Fe256582E5C8C2` |
+## Data and security
 
-### E2E on-chain proof (2026-04-18)
+The server reads `getAgentWallet` and `tokenURI` directly from the fixed BSC Testnet ERC-8004 registry. For these curated data-URI identities, it verifies the chain, wallet, identity metadata and exact A2A/HTTP endpoints before fetching the agent card from `desk.rouma.online`. An unavailable indexer is not an activation dependency. Unknown identity, changed endpoint, malformed metadata or failed RPC reads disable activation.
 
-- swap tx: [`0xa7fab38797227a122c3f837458dfd6ed70b0ecf51798d6d01cde7d8de3d09d29`](https://testnet.bscscan.com/tx/0xa7fab38797227a122c3f837458dfd6ed70b0ecf51798d6d01cde7d8de3d09d29)
-- settle tx: [`0xa754b56944d7473dd992dacc3d5645ad98b7fb7fc6b2395ebe8a3ddffc287913`](https://testnet.bscscan.com/tx/0xa754b56944d7473dd992dacc3d5645ad98b7fb7fc6b2395ebe8a3ddffc287913)
+Seller quotes use v1 flat JSON terms with lexicographically sorted keys, keccak256, and an EIP-191 signature over the raw hash. All four real signed responses are retained as public regression fixtures in `src/__tests__/fixtures/bnb-seller-quotes.json`.
 
----
+External agent-card and seller-response bodies have a 100 KB streaming limit. Curated URLs are server-owned, redirects are rejected, and requests time out. No caller-supplied URL is accepted.
 
-## Architecture
+Identity and card liveness are not performance scores. No fabricated APR, win rate, transaction count, or delivery record is shown.
 
-```
-Agent ─HTTP─► /api/v1/run ─► creator endpoint ─► evaluator
-                   │
-                   └─── fire-and-forget ───► SwapRouter.swap()
-                                                │
-                                                ├─► SkillRegistry (supply-gated setters,
-                                                │   treasury pool, CREATE2-deployed
-                                                │   ERC-20 per skill)
-                                                │
-                                                ├─► ReputationHub.scoreOf(agent) ≥ minRep
-                                                │
-                                                └─► settle() → creator/platform/reputationPool
-                                                              (USDC split; BAS attestation hook)
-```
+## Testnet contracts
 
-### Two orthogonal primitives
+| Role | Address |
+| --- | --- |
+| ERC-8004 registry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
+| Commerce | `0xa206c0517B6371C6638CD9e4a42Cc9f02A33B0DE` |
+| Router | `0xD7d36D66d2F1B608A0F943f722D27e3744f66F25` |
+| Policy | `0xd6a4217588f6b1f5657a92a3e94e6422ad771cea` |
+| Test $U | `0xc70B8741B8B07A6d61E54fd4B20f22Fa648E5565` |
 
-| Layer | Purpose | Phase 2 status |
-|---|---|---|
-| **ERC-20 per capability** (SKILL_RUN_TOKEN) | Interface uniformity. Every skill / item / service = ERC-20. Agents operate on token portfolios. Not for speculation — for composability. | ✅ live |
-| **Reputation-gated allocation** | `swap()` checks reputation before USDC. Day-1 floor = 0. Creators raise threshold as data accumulates → reputation gains real weight → RBE. | ✅ live, floor = 0 |
+Use https://testnet.bscscan.com to inspect these addresses and each transaction.
 
----
+## Verification and evidence status — September 8, 2026
 
-## Security — audit done + fixes applied
+- Direct onchain wallet/metadata reads: all four identities matched the curated configuration.
+- Canonical agent cards: all four responded successfully.
+- Real seller quotes: all four passed local schema, hash, signature, target and fee validation.
+- Unit/property tests cover changed identities, endpoint paths, wrong chain/payment targets, modified quote terms, invalid signatures, fee bounds, malformed payloads, oversized streams and funded-job retry decisions.
+- Funded-hire evidence: pending selection of the buyer wallet and its signatures. No new funded job or delivery is claimed by this document.
+- Deployment must be confirmed against `/api/health` and the deployed commit; a successful build alone is not deployment evidence.
+- Registration/submission confirmation: not found in the checked inbox. Confirm an existing response before submitting again.
 
-Ran 8-agent solidity-auditor on the Phase 2 suite. 8 HIGH-severity findings surfaced. All 8 fixed + regression tests added.
+For each category, record buyer address, job ID, quote hash, all five transaction hashes, seller response, and any resulting execution transaction. A response saying accepted/pending is not completed execution.
 
-| # | Finding | Fix |
-|---|---|---|
-| 1 | Provider price manipulation drains agent treasury | `setPrice` reverts while RUN_TOKEN totalSupply > 0 |
-| 2 | Permissionless slug squatting | Owner `transferProvider(skillId, newProvider)` |
-| 3 | Sandwich attack via `setPrice` front-run | `maxPriceUSDC` slippage param on buy/swap |
-| 4 | USDC blacklist permanently freezes funds | Pull-payment fallback + `claimPending` + `rescueTokens` |
-| 5 | Router upgrade bricks existing skill tokens | `SkillRunToken.router()` resolves live from registry |
-| 6 | `setActive` strands prepaid USDC | `redeemRunToken` escape hatch ignores active flag |
-| 7 | `setMinReputation` bricks prepaid tokens | Supply-gated (same as #1) |
-| 8 | No redeem path | `redeemRunToken(skillId, amount)` added |
+## Remaining submission boundaries
 
-**Tests: 155/155 forge test green** (including 18 audit regression tests + fuzz tests).
+The official main-track eligibility says surfaced agents must be live on BSC; it does not explicitly settle whether a testnet-only entry qualifies. Ask the organizer to confirm. All four categories must also have enough functional depth for judging; the bounded services above are intentionally disclosed.
 
----
+No Altana bounty qualification or TermiX Agent Advantage Report is claimed. The project does not claim official BNB adoption, a security audit, profitable trading, or mainnet readiness.
 
-## Key specs / ADRs
-
-- `specs/2026-04-16-agent-commerce-protocol.md` — full Phase 2 spec
-- `brain/wiki/decisions/2026-04-16-tokens-as-interface-reputation-as-allocation.md` — locked ADR
-- 8-week roadmap to mainnet + external audit post-hackathon
-
----
-
-## Links
-
-- Repo: https://github.com/JhiNResH/maiat-dojo
-- PR for this work: https://github.com/JhiNResH/maiat-dojo/pull/41
-- Live API: https://dojo.maiat.io (REST spec in repo)
-
----
-
-## Team
-
-JhiNResH (solo builder). Smart-contract audit background, targeting
-Smart Contract Security Engineer role at BNB ecosystem exchanges.
-
-## Why this matters
-
-Current agent economies re-use Web2 payment rails (OpenAI credits, SaaS subs).
-That means reputation lives off-chain, gets captured by platforms, and stays
-irrelevant to resource allocation. Maiat plants the opposite seed: every
-agent-to-skill interaction generates clean on-chain reputation data. Over time
-that reputation graph becomes the allocation mechanism — agents get access not
-because they paid, but because of who they are and what they've delivered.
-
-Skills are the entry point because they're high-frequency and have clean
-outcomes (delivered / not-delivered). Items and services follow in Phase 4
-using the same `swap()` interface.
+Before marking this entry submission-ready: verify the public deployment, complete and capture all four funded jobs, confirm main-track testnet acceptance, and retain the registration/submission confirmation.
