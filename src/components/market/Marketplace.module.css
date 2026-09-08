@@ -85,7 +85,7 @@
   justify-content: center;
   padding: 0 4px;
   color: var(--market-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .nav .active {
@@ -111,7 +111,7 @@
 .stepLabel,
 .fieldLabel {
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.13em;
@@ -131,7 +131,7 @@
   justify-content: center;
   border: 1px solid var(--market-line-strong);
   padding: 0 16px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
   transition: background-color 300ms cubic-bezier(0.23, 1, 0.32, 1), color 300ms cubic-bezier(0.23, 1, 0.32, 1), border-color 300ms cubic-bezier(0.23, 1, 0.32, 1);
@@ -178,7 +178,7 @@
 .railTop {
   color: var(--market-yellow);
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.14em;
 }
@@ -212,7 +212,7 @@
 .railNote {
   margin: 0;
   color: var(--market-muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.62;
   white-space: pre-line;
 }
@@ -264,7 +264,7 @@
 .homeCopy p {
   max-width: 540px;
   margin: 0;
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .homeStart {
@@ -290,17 +290,17 @@
 .homeStart li b {
   color: var(--market-yellow);
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .homeStart li strong {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .searchLabel {
   display: block;
   color: var(--market-muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .searchControl {
@@ -325,7 +325,7 @@
   outline: 0;
   background: transparent;
   color: var(--market-text);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .categoryHeader {
@@ -374,7 +374,7 @@
   max-width: 380px;
   margin: 0;
   color: #aeb6c2;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -384,7 +384,7 @@
 
 .categoryArrow {
   justify-self: end;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .categoryRow:hover .categoryArrow {
@@ -447,7 +447,7 @@
   background: #11130f;
   color: var(--market-yellow);
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
-  font-size: 10px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 850;
 }
@@ -455,7 +455,7 @@
 .agentHeading small {
   color: var(--market-muted);
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.1em;
 }
@@ -471,7 +471,7 @@
 .agentHeading p {
   margin: 0;
   color: var(--market-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .panelLead {
@@ -496,7 +496,7 @@
 .boundaryHeader span,
 .boundaryHeader strong {
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
-  font-size: 8px;
+  font-size: 12px;
   letter-spacing: 0.11em;
 }
 
@@ -527,7 +527,7 @@
 .summaryRows small {
   display: block;
   color: var(--market-muted);
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .boundaryGrid strong,
@@ -535,7 +535,7 @@
 .summaryRows strong {
   display: block;
   margin-top: 7px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .boundaryNote {
@@ -543,7 +543,7 @@
   padding: 12px 14px;
   border-top: 1px solid #343a43;
   color: var(--market-muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .actions {
@@ -556,7 +556,7 @@
   display: flex;
   gap: 8px;
   margin-top: 16px;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .controlNote strong {
@@ -598,7 +598,7 @@
   background: #15191f;
   color: #aeb5bf;
   padding: 0 10px;
-  font-size: 8px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -614,7 +614,7 @@
   grid-template-columns: 1.15fr 1.25fr 0.55fr 55px;
   align-items: center;
   border-top: 1px solid var(--market-line);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .tableLabels {
@@ -637,7 +637,7 @@
   border: 1px solid #4b535e;
   color: var(--market-yellow);
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
-  font-size: 9px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 800;
 }
@@ -676,7 +676,7 @@
 
 .emptyState p {
   color: var(--market-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .backLink {
@@ -684,7 +684,7 @@
   display: inline-flex;
   align-items: center;
   color: var(--market-muted);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 750;
 }
 
@@ -712,7 +712,7 @@
 .factGrid p {
   margin: 8px 0 0;
   color: var(--market-muted);
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.4;
 }
 
@@ -731,7 +731,7 @@
   grid-template-columns: 44px 1fr auto;
   align-items: center;
   border-bottom: 1px solid var(--market-line);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .controlList b {
@@ -752,7 +752,7 @@
 .actionPanel > p {
   max-width: 340px;
   color: var(--market-muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -780,11 +780,11 @@
   background: #252a32;
   color: var(--market-yellow);
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .startSteps span {
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .fullWidth {
@@ -799,7 +799,7 @@
   display: block;
   margin-top: 12px;
   color: var(--market-muted);
-  font-size: 8px;
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -825,7 +825,7 @@
 .fieldHeading span {
   color: var(--market-yellow);
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -860,7 +860,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--market-line-strong);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .choiceSelected .choiceMark {
@@ -875,14 +875,14 @@
 }
 
 .choice strong {
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .choice small,
 .choice em {
   margin-top: 4px;
   color: var(--market-muted);
-  font-size: 8px;
+  font-size: 12px;
   font-style: normal;
 }
 
@@ -894,7 +894,7 @@
 
 .field p {
   color: var(--market-muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .inputControl {
@@ -928,7 +928,7 @@
 .summaryAgent small {
   display: block;
   color: var(--market-muted);
-  font-size: 8px;
+  font-size: 12px;
 }
 
 .summaryAgent strong {
@@ -962,7 +962,7 @@
 .reviewNote strong,
 .reviewedNote strong {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .reviewNote span,
@@ -970,7 +970,7 @@
   display: block;
   margin-top: 5px;
   color: var(--market-muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .reviewedNote {
@@ -983,7 +983,7 @@
   border-left: 3px solid #f6465d;
   background: var(--market-base);
   color: #ff8796;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -996,7 +996,7 @@
   background: var(--market-base);
   color: #aeb6c2;
   font-family: var(--font-mono), ui-monospace, Menlo, monospace;
-  font-size: 8px;
+  font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
@@ -1009,6 +1009,40 @@
   cursor: not-allowed;
 }
 
+/* Readable product type, with the locked black/yellow visual hierarchy. */
+.app { font-size: 16px; line-height: 1.5; }
+.nav a, .connectButton, .primaryButton, .secondaryButton,
+.filterButton, .agentTableRow, .backLink, .controlList > div,
+.boundaryGrid strong, .summaryRows strong, .startSteps span { font-size: 14px; }
+.primaryButton, .secondaryButton, .connectButton, .filterButton { min-height: 44px; }
+.panelLead, .actionPanel > p, .emptyState p, .factGrid p,
+.boundaryNote, .reviewNote span, .reviewedNote span { font-size: 14px; line-height: 1.6; }
+.meta, .networkLabel { line-height: 1.5; letter-spacing: 0.08em; }
+.agentTableRow { gap: 12px; padding: 16px 0; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr) 82px 54px; }
+.agentCell, .agentTableRow > span { min-width: 0; overflow-wrap: anywhere; }
+.agentTableRow > span:nth-child(3) { overflow-wrap: normal; white-space: nowrap; }
+.searchLabel input { font-size: 16px; }
+.agentCell i { flex-shrink: 0; }
+.listHeader { grid-template-columns: 1fr; gap: 20px; }
+.listHeader .searchLabel { width: 100%; }
+.tableLabels { font-size: 12px; }
+.homeIntro, .homeStart, .boundary, .summaryPanel, .focusPanel, .listPanel { min-width: 0; }
+.boundaryHeader { gap: 12px; flex-wrap: wrap; }
+.primaryButton, .secondaryButton { padding: 12px 16px; text-align: center; }
+.jobsContent { min-width: 0; padding: 40px; max-width: 1200px; width: 100%; }
+.jobsContent h1 { font-size: clamp(32px, 4vw, 48px); margin: 0 0 16px; line-height: 1.1; }
+.jobsContent > p { max-width: 720px; color: var(--market-muted); }
+.jobCard { margin: 24px 0; padding: 24px; border: 1px solid var(--market-line); background: var(--market-panel); overflow-wrap: anywhere; }
+.jobCard h2 { font-size: 22px; margin: 0 0 8px; }
+.jobCard p { margin: 12px 0; }
+.jobActions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.jobStatus { color: var(--market-yellow); font-size: 14px; }
+.jobEvents { padding: 0; list-style: none; }
+.jobEvents li { border-top: 1px solid var(--market-line); padding: 12px 0; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; font-size: 14px; }
+.jobCard a:not(.primaryButton):not(.secondaryButton) { text-decoration: underline; text-underline-offset: 4px; }
+.jobCard time, .journalNote { color: var(--market-muted); font-size: 14px; }
+.jobCard pre { font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; }
+
 @media (prefers-reduced-motion: reduce) {
   .connectButton,
   .primaryButton,
@@ -1020,7 +1054,7 @@
 
 @media (max-width: 1100px) {
   .header {
-    grid-template-columns: 220px 1fr 240px;
+    grid-template-columns: 180px 1fr auto;
   }
 
   .directoryFrame {
@@ -1036,17 +1070,20 @@
   }
 }
 
-@media (max-width: 800px) {
+@media (max-width: 900px) {
   .header {
     grid-template-columns: 1fr auto;
     padding: 0 20px;
   }
 
-  .nav,
   .networkLabel {
     display: none;
   }
 
+  .nav { display: flex; grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; gap: 20px; padding: 8px 0; }
+  .network { grid-column: 2; grid-row: 1; }
+  .jobsContent { padding: 28px 20px; }
+  .jobCard { padding: 20px; }
   .frame,
   .directoryFrame {
     grid-template-columns: 1fr;
