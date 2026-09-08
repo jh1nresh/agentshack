@@ -1,5 +1,6 @@
-import { redirect } from "next/navigation";
+import { MarketplaceFrame } from "@/components/market/MarketplaceFrame";
+import { MarketJobs } from "@/components/market/MarketJobs";
 
 export default function DashboardPage() {
-  redirect("/");
+  return <MarketplaceFrame primaryWord="YOUR" accentWord="AGENTS" note={"One wallet.\nYour saved jobs."}><MarketJobs /></MarketplaceFrame>;
 }

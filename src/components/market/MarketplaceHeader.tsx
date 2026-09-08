@@ -2,12 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePathname } from "next/navigation";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import styles from "./Marketplace.module.css";
 
 export function MarketplaceHeader() {
-  const { ready, authenticated, login, logout, user } = usePrivy();
-  const wallet = user?.wallet?.address;
+  const pathname = usePathname();
+  const { ready, authenticated, login, logout } = usePrivy();
+  const { wallets } = useWallets();
+  const wallet = wallets[0]?.address;
   const accountLabel = wallet ? `${wallet.slice(0, 5)}…${wallet.slice(-4)}` : "Connected";
 
   return (
@@ -18,10 +21,13 @@ export function MarketplaceHeader() {
       </Link>
 
       <nav className={styles.nav} aria-label="Primary navigation">
-        <Link href="/" className={styles.active}>Market</Link>
-        <Link href="/dashboard">My agents</Link>
-        <Link href="/dashboard">Activity</Link>
-        <Link href="/create">Build</Link>
+        {[
+          { href: "/", label: "Market", active: pathname === "/" || pathname.startsWith("/market") },
+          { href: "/dashboard", label: "My agents", active: pathname === "/dashboard" },
+          { href: "/activity", label: "Activity", active: pathname === "/activity" },
+        ].map((item) => (
+          <Link key={item.href} href={item.href} className={item.active ? styles.active : undefined} aria-current={item.active ? "page" : undefined}>{item.label}</Link>
+        ))}
       </nav>
 
       <div className={styles.network}>
