@@ -1,7 +1,8 @@
-# Maiat Dojo — Spec Index
+# Maiat Dojo — Historical Spec Index (April 27, 2026)
 
-> Auto-read this file FIRST when entering the repo to avoid re-discovering existing work.
-> Last updated: 2026-04-27
+> Preserved planning snapshot, not current product or release status. Start with the
+> [AgentShack README](../../README.md) and [documentation index](../README.md).
+> Local `~/brain` references and dated PR statuses below are historical, not public links or current instructions.
 
 ---
 

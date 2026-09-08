@@ -1,6 +1,10 @@
 # BNB Agent Marketplace UI lock
 
-Status: approved visual direction, demo-data implementation.
+Status: historical approved visual baseline (fixture-data stage). The black/yellow
+direction remains relevant, but these screenshots are not current runtime proof.
+The source now includes curated testnet agents and wallet-approved hiring; see the
+[current overview](../../../README.md) and [hackathon guide](../../../HACKATHON.md).
+The flow, fixture restrictions and capture claims below describe the original UI lock.
 
 ## Product flow
 

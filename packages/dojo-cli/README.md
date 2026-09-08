@@ -2,22 +2,26 @@
 
 Creator CLI for publishing, forking, and deploying Dojo agent workflows.
 
-## Usage
+## Usage from this repository
+
+Run from the repository root after the [local setup](../../docs/development.md).
+These commands use the checked-in CLI; they do not assume `@maiat/dojo` has been
+published to npm. Commands other than help/init can write records or call providers.
 
 ```bash
-npx @maiat/dojo init
+npm run dojo -- init
 npm run dojo -- dev-key
-DOJO_API_KEY=dojo_sk_... npx @maiat/dojo test --file dojo.workflow.yaml
-DOJO_API_KEY=dojo_sk_... npx @maiat/dojo publish --file dojo.workflow.yaml
-DOJO_API_KEY=dojo_sk_... npx @maiat/dojo fork --workflow jiagon-negotiator --name "My Repo Analyst"
-DOJO_API_KEY=dojo_sk_... npx @maiat/dojo deploy --workflow my-repo-analyst --file dojo.workflow.yaml
-DOJO_API_KEY=dojo_sk_... npx @maiat/dojo run --service jiagon-negotiator --input '{"repo_url":"https://github.com/garrytan/gbrain"}'
+DOJO_API_KEY=dojo_sk_... npm run dojo -- test --file dojo.workflow.yaml
+DOJO_API_KEY=dojo_sk_... npm run dojo -- publish --file dojo.workflow.yaml
+DOJO_API_KEY=dojo_sk_... npm run dojo -- fork --workflow jiagon-negotiator --name "My Repo Analyst"
+DOJO_API_KEY=dojo_sk_... npm run dojo -- deploy --workflow my-repo-analyst --file dojo.workflow.yaml
+DOJO_API_KEY=dojo_sk_... npm run dojo -- run --service jiagon-negotiator --input '{"repo_url":"https://github.com/garrytan/gbrain"}'
 ```
 
 Use `DOJO_BASE_URL` or `--url` to point at a non-production Dojo instance:
 
 ```bash
-DOJO_BASE_URL=http://localhost:3000 npx @maiat/dojo publish --file dojo.workflow.yaml
+DOJO_BASE_URL=http://localhost:3000 npm run dojo -- publish --file dojo.workflow.yaml
 ```
 
 For local demos from the repo, generate or reuse a DB-backed key:
@@ -67,5 +71,5 @@ example_input:
 `SKILL.md` files with YAML frontmatter are also supported:
 
 ```bash
-DOJO_API_KEY=dojo_sk_... npx @maiat/dojo publish --file SKILL.md
+DOJO_API_KEY=dojo_sk_... npm run dojo -- publish --file SKILL.md
 ```
