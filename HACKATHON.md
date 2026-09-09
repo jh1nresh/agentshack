@@ -2,6 +2,8 @@
 
 A BSC Testnet marketplace for discovering, inspecting and hiring curated BNB Agent Studio agents across all four main-track categories.
 
+[Project overview](README.md) · [Development](docs/development.md) · [Documentation](docs/README.md)
+
 - Track: Main Track — Build the BNB Agent Studio Marketplace.
 - Repository: https://github.com/jh1nresh/agentshack
 - Public marketplace: https://www.agentshack.io/market
@@ -30,8 +32,8 @@ The marketplace lists third-party Studio Desk services. The descriptions above d
 3. Open its setup page and connect a BSC Testnet wallet.
 4. Request a signed quote. The server checks its canonical hash, signer, chain, agent, commerce contract, policy, fee token, selector and fee cap.
 5. Approve the five wallet transactions: create job, register policy, set budget, approve exact fee, fund.
-6. Request delivery. Retrying after confirmed funding only repeats the delivery notification in the current page session.
-7. Inspect the seller response and transaction links. Record delivery and actual execution evidence separately.
+6. Request delivery. My agents (`/dashboard`) and Activity (`/activity`) retain wallet-scoped records in the same browser. Recovery verifies the original successful create/fund transactions before retrying notification, without creating another payment.
+7. Inspect the seller response and transaction links. Record delivery and actual execution evidence separately. Partial/replaced transactions require manual review; history is not imported from older sessions without saved records or other devices. Notification retry is not an exactly-once guarantee.
 
 The wallet needs testnet BNB for gas and the seller's quoted test $U token. The four currently listed fees total 0.0042 test $U, excluding gas. The app does not acquire tokens or send a private key to a server.
 
@@ -65,7 +67,7 @@ Use https://testnet.bscscan.com to inspect these addresses and each transaction.
 - Unit/property tests cover changed identities, endpoint paths, wrong chain/payment targets, modified quote terms, invalid signatures, fee bounds, malformed payloads, oversized streams and funded-job retry decisions.
 - Funded-hire evidence: pending selection of the buyer wallet and its signatures. No new funded job or delivery is claimed by this document.
 - Deployment must be confirmed against `/api/health` and the deployed commit; a successful build alone is not deployment evidence.
-- Registration/submission confirmation: not found in the checked inbox. Confirm an existing response before submitting again.
+- Registration/submission confirmation: not established by repository or CI evidence. Confirm an existing response before submitting again.
 
 For each category, record buyer address, job ID, quote hash, all five transaction hashes, seller response, and any resulting execution transaction. A response saying accepted/pending is not completed execution.
 

@@ -1,83 +1,45 @@
-# Dojo Contracts
+# Contracts
 
-On-chain contracts for the Maiat Dojo — Agent Skill Marketplace.
+[AgentShack overview](../README.md) · [Documentation](../docs/README.md)
 
-## Contracts
+Solidity sources and Foundry tests retained by AgentShack / Maiat Dojo. This directory is **not** the source of every third-party contract used by the BNB marketplace.
 
-| Contract | Description |
-|----------|-------------|
-| **SkillNFT** | ERC-1155 skill tokens with USDC auto-split (85% creator / 10% platform / 5% reputation pool) |
-| **SkillRoyaltySplitter** | Agent Services payment split (80% operator / 15% creator / 5% platform) |
-| **ISkillNFT** | Shared interface for cross-contract reads |
+## Three distinct boundaries
 
-## Deployments
+| Surface | Configuration / source |
+| --- | --- |
+| Curated BNB marketplace | [`bnb-marketplace.ts`](../src/lib/bnb-marketplace.ts) and [`bnb-marketplace-activation.ts`](../src/lib/bnb-marketplace-activation.ts); chain 97, third-party registry/seller/commerce integration |
+| Dojo receipt and settlement engine | [`contracts.ts`](../src/lib/contracts.ts); separate addresses and mainnet placeholders |
+| Local Solidity code | [`src/`](src/): registry, job, reputation, token, royalty and swap components retained across product iterations |
 
-### Base Sepolia (Testnet)
+Do not interchange these contract addresses. The [hackathon guide](../HACKATHON.md#testnet-contracts) documents the marketplace targets; source configuration remains authoritative.
 
-| Contract | Address |
-|----------|---------|
-| SkillNFT | [`0x52635F45b087c1059B3a997fb089bae5Db095B74`](https://sepolia.basescan.org/address/0x52635F45b087c1059B3a997fb089bae5Db095B74) |
-| SkillRoyaltySplitter | [`0x98D34100F6030DFDc1370fB45dFa1Ad7980D4bD8`](https://sepolia.basescan.org/address/0x98D34100F6030DFDc1370fB45dFa1Ad7980D4bD8) |
-| USDC (Circle testnet) | [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e) |
+## Build and test (no transactions)
 
-### Base Mainnet
-
-TBD — deploy after testnet validation.
-
-## Build & Test
+Install Foundry and the exact dependency revisions pinned by the [CI workflow](../.github/workflows/ci.yml). In a fresh checkout, from the repository root:
 
 ```bash
+git clone https://github.com/foundry-rs/forge-std.git contracts/lib/forge-std
+git -C contracts/lib/forge-std checkout --detach 0844d7e1fc5e60d77b68e469bff60265f236c398
+git clone https://github.com/OpenZeppelin/openzeppelin-contracts.git contracts/lib/openzeppelin-contracts
+git -C contracts/lib/openzeppelin-contracts checkout --detach 5fd1781b1454fd1ef8e722282f86f9293cacf256
 cd contracts
-forge build       # compile
-forge test        # 56 tests (43 unit + 13 fuzz)
-forge test -vvv   # verbose output
+forge build --sizes
+forge test -vv
 ```
 
-## Deploy
+If dependencies already exist, inspect their revisions and changes rather than overwriting them. `forge build` and this test suite are verification commands, not a deployment procedure. Use CI logs for current test counts.
 
-```bash
-# Base Sepolia
-PRIVATE_KEY=0x... forge script script/Deploy.s.sol --rpc-url base-sepolia --broadcast
+## Deployment and operational safety
 
-# Base Mainnet
-PRIVATE_KEY=0x... forge script script/Deploy.s.sol --rpc-url base --broadcast
-```
+- [`foundry.toml`](foundry.toml) currently defines `bsc` and `bsc_testnet` RPC aliases.
+- The root [Makefile](../Makefile) still has legacy Base deploy/interaction targets. They are not supported instructions for this marketplace.
+- [`script/`](script/) contains state-changing deployment and seed scripts. No broadcast, signer/role change or settlement is authorized by following this README.
+- Marketplace hires are approved by the user's BSC Testnet wallet. Mainnet entries in the retained Dojo configuration include zero-address placeholders and must not be presented as ready.
+- The [release policy](../config/maiat-release-policy.json) separates app readiness from contract broadcast and chain writes.
 
-Optional: set `BASESCAN_API_KEY` in env and uncomment `[etherscan]` in `foundry.toml` for contract verification.
+## Security and historical references
 
-## Architecture
+[`audits/`](audits/) contains dated reports for specific code and review scopes. Their presence is not a current security certification, a formal third-party audit of the marketplace, or an audit of Studio Desk sellers.
 
-```
-SkillNFT (ERC-1155 + ERC-2981 + ISkillNFT)
-├── createSkill()     — Owner lists a skill (price, creator, royaltyBps, URI)
-├── buySkill()        — Anyone pays USDC → auto-split → mint NFT
-├── setSkillActive()  — Owner activates/deactivates
-├── setFees()         — Atomic fee update (platform + reputation pool)
-└── rescueTokens()    — Emergency fund recovery
-
-SkillRoyaltySplitter
-├── pay()             — Service payment → 80/15/5 split (operator/creator/platform)
-│   ├── Operator must hold skill NFT (M-3)
-│   ├── Skill must be active (L-4)
-│   ├── Pull-then-push pattern (M-2)
-│   └── MIN_AMOUNT enforced (Lead)
-├── setFeeSplit()     — Adjust split (operator ≥ 50%)
-└── rescueTokens()    — Emergency fund recovery
-```
-
-## Security
-
-- **Audited** by Jensen (Slither + Trail of Bits skills) + Patrick (Pashov parallel 8-agent audit)
-- 5 findings resolved (3 Medium + 2 Low) + 6 leads addressed
-- Full audit reports: [`contracts/audits/`](./audits/)
-- ReentrancyGuard on all payment functions
-- Pull-then-push pattern prevents USDC blacklist DoS
-- Operator NFT ownership verified on every service payment
-
-## Key Design Decisions
-
-- **USDC only** — no native ETH, no oracle dependency, minimal attack surface
-- **No funds held** — contract distributes immediately, nothing to steal
-- **Atomic fee updates** — prevents non-atomic misconfiguration
-- **MIN_PRICE / MIN_AMOUNT** — prevents dust/spam transactions
-- **royaltyBps** is ERC-2981 only (secondary market); Agent Services uses global split
+The former Base deployment table, SkillNFT split descriptions and original audit claims are preserved in [legacy Base contract notes](../docs/archive/legacy-base-contracts.md), clearly separated from current setup.
