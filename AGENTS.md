@@ -30,10 +30,18 @@ or on-chain authority change.
   production health.
 - Feedback: deterministic failure, security finding, contract invariant, or
   production revision mismatch.
-- Artifact: one atomic PR, one `maiat-release-readiness.json`, and one
-  `maiat-delivery-receipt.json`.
-- Convergence: all app and contract checks pass and production reports the
-  exact merged commit under the approved release policy.
+- Artifact and convergence follow the requested stage:
+  - Local-only: scoped patch plus applicable verification; no PR or production
+    state is required to report local implementation verified.
+  - PR: one atomic PR with applicable checks and review evidence. Report merge
+    and deployment as not requested unless separately authorized.
+  - Merge: verify the authorized merge and its readiness checks.
+  - Deployment: only for an authorized release, require
+    `maiat-release-readiness.json`, `maiat-delivery-receipt.json`, and production
+    readback of the expected commit and approved chain.
+- Do not wait for an unrequested release or broaden authority just to satisfy a
+  delivery receipt. Full app/contract/release checks apply when their affected
+  scope or requested stage requires them.
 - Human approval: merge, database migration, production secret, Vercel/Railway
   setting, cron activation, chain switch, contract broadcast/verification,
   signer/role change, transaction, settlement, refund, and fund movement.
